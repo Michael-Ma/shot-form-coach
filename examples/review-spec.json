@@ -1,0 +1,55 @@
+{
+  "schema_version": "shot-form-review-example/v1",
+  "status": "design_example_pending_coach_review",
+  "source_project": "video-event-workbench",
+  "source_run_id": "run_a1c90e2bdcd74c75a3328b60fd8334e6",
+  "annotation_source": "assistant_visual_review",
+  "created_date": "2026-10-07",
+  "finding_id": "follow_through_consistency_example",
+  "finding_type": "observed_difference",
+  "observation": "Shot 1 lowers the shooting arm earlier in the displayed post-release window than the selected Shot 2 comparator.",
+  "coaching_hypothesis": "A relaxed, repeatable finish may be a useful practice cue; its effect on release consistency requires a matched retest.",
+  "diagnosis_status": "not_established",
+  "cause_of_miss": null,
+  "numerical_pose_measurements": null,
+  "reference": {
+    "kind": "personal_comparator_plus_original_teaching_schematic",
+    "teaching_source_ids": ["curry-mechanics", "curry-form-practice"],
+    "measured_curry_motion": false,
+    "comparator_is_whole_body_ideal": false
+  },
+  "camera_comparison": "same_recording_uncalibrated_oblique_view",
+  "shots": [
+    {
+      "label": "Shot 1",
+      "event_id": "event_g00000_000",
+      "release_interval_source_us": [4966667, 5033333],
+      "crop_xywh": [1120, 340, 560, 720],
+      "highlight_crop_xywh": [50, 175, 310, 200],
+      "panel_role": "rep_to_review"
+    },
+    {
+      "label": "Shot 2",
+      "event_id": "event_g00001_000",
+      "release_interval_source_us": [14268333, 14335000],
+      "crop_xywh": [1010, 340, 560, 720],
+      "highlight_crop_xywh": [50, 45, 310, 300],
+      "panel_role": "personal_comparator_for_one_attribute"
+    }
+  ],
+  "render": {
+    "still_relative_to_release_s": 0.7,
+    "video_relative_range_s": [-0.6, 0.8],
+    "slow_motion_speed": 0.4,
+    "intro_hold_s": 1.0,
+    "end_hold_s": 3.5,
+    "output_fps": 25,
+    "schematic_label": "Original teaching schematic, not measured Curry motion"
+  },
+  "limitations": [
+    "Release intervals were visually bracketed during design work and need independent review.",
+    "Different post-release arm positions do not prove a technical error or explain a miss.",
+    "The selected personal comparator is not a verified ideal shot.",
+    "No calibrated 3D, ball-spin, finger-pressure or force measurement was performed."
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "version": "curry-informed-draft-1",
+  "status": "design_proposal_not_validated_classifier",
+  "rules": [
+    {
+      "id": "coordination_review",
+      "source_ids": ["curry-mechanics", "curry-course-preview"],
+      "scope": "fixed-camera stationary jump shot",
+      "required_evidence": ["lower_body_loading_visible", "ball_and_shooting_arm_visible", "release_interval"],
+      "inspect": ["order_of_loading_rising_and_ball_lift", "relative_phase_durations", "repeatability_across_matched_shots"],
+      "universal_numeric_threshold": null,
+      "cue_type": "hypothesis_to_test",
+      "cue": "Use comfortable close-range attempts to test a coordinated rise and ball lift, then compare repeated attempts."
+    },
+    {
+      "id": "follow_through_consistency",
+      "source_ids": ["curry-mechanics", "curry-form-practice"],
+      "scope": "unguarded stationary practice shots",
+      "required_evidence": ["release_interval", "shooting_arm_visible_after_release", "sufficient_post_release_context"],
+      "inspect": ["shooting_arm_position_after_release", "finish_hold_consistency"],
+      "universal_numeric_threshold": null,
+      "cue_type": "hypothesis_to_test",
+      "cue": "Complete the release with comfortable extension and briefly retain a relaxed finish during close-range practice.",
+      "causal_limit": "Post-release movement does not change a ball already in flight. This cue must be assessed through its relationship to repeatability around release."
+    },
+    {
+      "id": "balance_repeatability",
+      "source_ids": ["curry-mechanics", "curry-practice-routine"],
+      "scope": "matched stationary jump shots with visible feet and trunk",
+      "required_evidence": ["camera_motion_accounted_for", "feet_visible", "trunk_visible", "landing_context"],
+      "inspect": ["base_of_support", "projected_body_displacement", "landing_pattern_repeatability"],
+      "universal_numeric_threshold": null,
+      "cue_type": "review_question",
+      "cue": "Compare balance and landing across attempts at the same location before deciding whether a change is useful."
+    }
+  ],
+  "global_constraints": [
+    "Reference similarity alone cannot establish a technical error.",
+    "Do not infer a unique movement fault from make/miss or miss direction.",
+    "Unknown or occluded measurements remain null.",
+    "Do not turn published teaching cues into universal cross-person angle thresholds."
+  ]
+}
