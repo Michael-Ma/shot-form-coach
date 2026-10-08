@@ -1,0 +1,22 @@
+{
+  "version": "teaching-arm-illustration-v1",
+  "source_type": "qualitative_teaching_illustration",
+  "source_ids": ["curry-mechanics", "curry-form-practice", "jr-nba-shooting"],
+  "rubric_ids": ["comfortable_release", "relaxed_finish"],
+  "label": {"en": "Extension & finish guide", "zh": "伸展与收势示意"},
+  "description": {
+    "en": "A shooting-arm illustration adapted to your projected arm lengths and release direction. It shows the idea of comfortable extension and briefly retaining a finish. It is not a measured expert pose or a universal correct angle.",
+    "zh": "按你的画面臂长和这球的出手方向，示意舒适伸展、稍留收势的教学目标。它不是实测的球星姿态，也不规定所有人相同的正确角度。"
+  },
+  "teach_target_basis": {
+    "en": "The sources support qualitative extension and follow-through cues. The geometry, angle and display duration below are product illustration choices, not values prescribed or validated by those sources. Only the shooting arm is drawn; body balance and hand/finger relaxation are not synthesized.",
+    "zh": "来源支持伸展与随挥的定性教学提示。下列几何形状、角度和显示时段是产品的示意选择，并非来源规定或验证的标准。只绘制出手臂，不合成全身平衡、手腕或手指的放松姿态。"
+  },
+  "template_angle_deg": 165,
+  "angle_policy": "Use at least the illustrative angle, retaining a more extended observed release when present; never grade a shot by this angle or force elbow lockout.",
+  "display_after_release_us": 800000,
+  "display_window_policy": "The overlay window is for review only, not a required hold duration.",
+  "adaptation": "Median visible projected upper-arm/forearm lengths and shoulder-to-wrist direction near this shot's release; anchor at the visible current shooting shoulder. No whole-body ideal and no copied celebrity motion.",
+  "grading_thresholds": null,
+  "measured_expert_motion": false
+}

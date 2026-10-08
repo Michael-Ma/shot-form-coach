@@ -66,6 +66,11 @@ INSTRUCTION = (
     "comparison shot. Post-release-only changes are at most low-priority coaching hypotheses. "
     "If contact, hands, feet or later motion are unclear, say what cannot be judged instead of inventing a fault. "
     "Do not criticize an action simply because it differs from a numerical measurement or a selected sample. "
+    "For each supplied rubric dimension, provide coverage: aligned when the visible action matches the "
+    "qualitative goal, needs_review for a specific supported gap, not_visible when required body detail is "
+    "not shown, or uncertain when ambiguous. Cite supplied frames for assessed dimensions. "
+    "A successful review with no major fault must still explain what looks sound and what cannot be seen. "
+    "Do not conflate no priority issue with inability to analyze. "
     "Observations are optional coarse visibility/rhythm/finish classifications, limited to three."
 )
 
@@ -154,7 +159,7 @@ def call_sdk(settings, frames, config):
             config=types.GenerateContentConfig(
                 system_instruction=config.get("_instruction", INSTRUCTION),
                 response_mime_type="application/json",
-                response_schema=ModelReply,
+                response_json_schema=model_reply_schema(),
                 max_output_tokens=16000,
                 temperature=1,
                 thinking_config=types.ThinkingConfig(thinking_level="LOW"),
@@ -186,13 +191,30 @@ def assist(settings, repo, job_id, asset, config, cancelled, transport=None):
     if len(job["receipts"]) >= config["max_model_calls"]:
         raise ValueError("model_call_budget_exhausted")
     for previous in repo.all("job"):
-        if any(
+        unresolved = [
             r.get("asset_id") == asset["id"]
             and r.get("provider", "gemini") == provider
             and r["status"] in ("submitting", "request_unknown")
             for r in previous.get("receipts", [])
-        ):
-            raise ValueError("unresolved_request_blocks_resubmission")
+        ]
+        if any(unresolved):
+            if not config.get("allow_unknown_retry"):
+                raise ValueError("unresolved_request_blocks_resubmission")
+            updated_receipts = []
+            for prior in previous.get("receipts", []):
+                if (
+                    prior.get("asset_id") == asset["id"]
+                    and prior.get("provider", "gemini") == provider
+                    and prior.get("status") in ("submitting", "request_unknown")
+                ):
+                    prior = {
+                        **prior,
+                        "status": "retry_authorized",
+                        "outcome": "unknown",
+                        "retry_authorization": {"actor": "user", "at": now(), "new_job_id": job_id},
+                    }
+                updated_receipts.append(prior)
+            repo.patch("job", previous["id"], receipts=updated_receipts)
     frames = sampled_frames(asset, config["max_input_frames"])
     if cancelled():
         raise InterruptedError("cancelled")
@@ -260,13 +282,30 @@ def assist(settings, repo, job_id, asset, config, cancelled, transport=None):
             raise InterruptedError("cancelled") from None
         raise ValueError("request_unknown") from None
     except Exception as exc:
+        status = getattr(exc, "code", None)
+        if not isinstance(status, int):
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+        rejected = isinstance(status, int) and status in (400, 401, 403, 404, 413, 415, 422, 429)
+        code = (
+            {
+                400: "provider_bad_request",
+                401: "provider_auth_error",
+                403: "provider_auth_error",
+                404: "provider_model_unavailable",
+                429: "provider_rate_limited",
+            }.get(status, "provider_rejected")
+            if rejected
+            else "request_unknown"
+        )
         receipt.update(
-            status="request_unknown",
+            status="provider_rejected" if rejected else "request_unknown",
             exception_type=type(exc).__name__,
-            cost=estimate_call_cost(snapshot, {}, outcome_unknown=True),
+            http_status=status,
+            error_code=code,
+            cost=estimate_call_cost(snapshot, {}, outcome_unknown=not rejected),
         )
         repo.patch("job", job_id, receipts=receipts)
-        raise ValueError("request_unknown") from None
+        raise ValueError(code) from None
     # Persist usage and the response before validation and late cancellation.
     receipt.update(status="received", response=response, cost=estimate_call_cost(snapshot, response["usage"]))
     repo.patch("job", job_id, receipts=receipts)

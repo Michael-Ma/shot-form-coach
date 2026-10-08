@@ -89,6 +89,26 @@ retain projected wrist and elbow measurements; the main view translates them int
 terms and explains the limits of each observation. Missing body points or later context produce unavailable values,
 not zero. The UI gives one practice hypothesis to test in a matched retake.
 
+## Read the result and compare poses
+
+A successful model review with no major correction is now shown separately from limited
+visibility, local-only measurements and a failed model request. Visible strengths remain
+available even when a local shooting-hand estimate limits some numerical measurements.
+
+In **Settings → Comparison**, choose a pose target; enable the pose overlay in **Playback**.
+Orange is your measured pose and dashed green is the selected target. Use the release and
+follow-through buttons to inspect matching moments:
+
+- **Teaching target illustration** adapts an original shooting-arm extension/finish guide to
+  your projected limb lengths and release direction. It is not a measured celebrity pose,
+  a universal ideal angle, or a score.
+- **Selected personal reference** aligns another clip by release time and torso scale, retaining
+  body lean and drift. It requires compatible hands/views and visible corresponding frames.
+
+The preview explains when a target cannot be shown and reports descriptive projected differences.
+This new overlay applies to the interactive preview; existing video exports keep the side-by-side
+comparison layout. A visual gap alone is not treated as a technique error.
+
 ## Choose Gemini or Astra
 
 All modes retain the local body/ball tracks and numerical measurements. The model adds an
@@ -122,8 +142,9 @@ API charge. See [Codex automation](https://learn.chatgpt.com/docs/non-interactiv
 Each job permits at most six model calls by default. Direct API calls allow at most 16,000
 output tokens; Codex uses its CLI/model limits and a constrained final schema. There is no
 automatic retry. Usage is retained across invalid replies and cancellation. An unknown request
-outcome remains unknown and blocks another call to that provider for the same clip. Local
-analysis remains available. API prices are estimates; Codex plan usage is shown separately.
+outcome remains unknown and blocks another call to that provider for the same clip until the
+user explicitly allows a new single-shot request in Settings. Known HTTP rejections are recorded
+separately. Local analysis remains available. API prices are estimates; Codex plan usage is shown separately.
 
 Selecting a remote model and starting analysis sends the selected frames to that model's service.
 Keys and local runtime data remain outside Git. Qwen is still an evaluation candidate.

@@ -125,8 +125,10 @@ def test_uncertain_release_or_side_withholds_precise_review(kwargs):
     result = build_review(shot)
     assert result["status"] == "limited"
     assert result["issues"] == []
-    assert all(m["status"] == "unavailable" for m in result["metrics"])
-    assert "暂时不能给出可靠的动作判断" in result["overall"]["summary"]["zh"]
+    assert result["outcome"] == "limited_visibility"
+    available = [m["id"] for m in result["metrics"] if m["status"] == "measured"]
+    # The known release and hip timing do not need an identified shooting arm.
+    assert available == (["release_rhythm"] if "side_source" in kwargs else [])
 
 
 def test_unanalyzed_review_invites_analysis_without_claiming_good_form():
@@ -261,3 +263,151 @@ def test_model_cannot_redefine_the_standard_or_add_unevidenced_summary():
     shot["model_assist"] = {"asset_revision": 4, "coaching": model_coaching([])}
     result = build_review(shot)
     assert "Dip to release" in result["overall"]["summary"]["en"]
+
+
+def reviewed_without_faults():
+    """Shape of the accepted existing reviews: cited strengths, no invented faults."""
+    return {
+        "overall_summary": {
+            "en": "The visible rise connects into extension and the landing stays controlled. The guide hand is too small to assess precisely.",
+            "zh": "可见起身连贯地接入伸展，落地保持可控。辅助手画面太小，无法精细判断。",
+        },
+        "strengths": [
+            {
+                "title": bi(title),
+                "detail": bi(detail),
+                "evidence_frame_ids": ["f4", "f5"],
+            }
+            for title, detail in [
+                ("Connected rise", "The visible body rise connects into the arm motion."),
+                ("Completed extension", "The arm visibly continues through the release."),
+                ("Controlled landing", "The feet settle without a visible recovery step."),
+            ]
+        ],
+        "issues": [],
+    }
+
+
+@pytest.mark.parametrize("side_source", ["user_setting", "ambiguous_estimate"])
+def test_cited_model_strengths_without_issues_are_a_completed_visual_review(side_source):
+    shot = asset(side_source=side_source)
+    coaching = reviewed_without_faults()
+    shot["model_assist"] = {"asset_revision": 4, "coaching": coaching}
+    result = build_review(shot)
+    assert result["outcome"] == "no_priority_issue"
+    assert result["assessment_source"] == "model"
+    assert result["overall"]["summary"] == coaching["overall_summary"]
+    assert result["strengths"] == coaching["strengths"]
+    assert result["issues"] == []
+    assert "不代表动作完美" in result["empty_state"]["detail"]["zh"]
+    assert result["coverage"]["model_review"] == "accepted"
+    assert result["coverage"]["dimension_coverage"] == "unspecified"
+    assert result["coverage"]["dimensions"] == []
+    if side_source == "ambiguous_estimate":
+        assert any("出手侧" in item["zh"] for item in result["limitations"])
+        assert result["coverage"]["available_metrics"] == 1
+
+
+def test_failed_visual_call_is_not_reported_as_poor_video_visibility():
+    shot = asset()
+    shot.update(model_assist=None, model_error="GeminiClientError")
+    result = build_review(shot)
+    assert result["outcome"] == "model_failed"
+    assert result["coverage"]["model_review"] == "failed"
+    assert result["coverage"]["available_metrics"] == 4
+    assert "处理失败" in result["empty_state"]["detail"]["zh"]
+    assert result["overall"]["headline"]["zh"] == "本次视觉评价未完成"
+
+
+def test_local_measurements_do_not_claim_a_clean_visual_assessment():
+    result = build_review(asset())
+    assert result["outcome"] == "measurements_only"
+    assert result["coverage"]["model_review"] == "not_run"
+    assert result["empty_state"]["title"]["zh"] == "动作数据已就绪"
+    new = build_review({"id": "new", "frame_index": []})
+    assert new["outcome"] == "awaiting_analysis"
+
+
+@pytest.mark.parametrize("kwargs", [{"side_source": "ambiguous_estimate"}, {"interval": [100000, 800000]}])
+def test_local_uncertainty_withholds_only_dependent_model_issues(kwargs):
+    shot = asset(**kwargs)
+    coaching = reviewed_without_faults()
+    coaching["issues"] = [model_issue("comfortable_release"), model_issue("balanced_landing")]
+    shot["model_assist"] = {"asset_revision": 4, "coaching": coaching}
+    result = build_review(shot)
+    assert result["assessment_source"] == "model"
+    assert result["outcome"] == "issues_found"
+    assert [item["rubric_id"] for item in result["issues"]] == ["balanced_landing"]
+    assert result["coverage"]["withheld_dimensions"] == ["comfortable_release"]
+    assert result["strengths"] == coaching["strengths"]
+    assert result["overall"]["summary"] == coaching["overall_summary"]
+
+
+def test_withheld_model_issue_does_not_become_no_priority_issue():
+    shot = asset(interval=[100000, 800000])
+    shot["model_assist"] = {"asset_revision": 4, "coaching": model_coaching()}
+    result = build_review(shot)
+    assert result["assessment_source"] == "model"
+    assert result["outcome"] == "limited_visibility"
+    assert result["issues"] == []
+    assert result["coverage"]["withheld_dimensions"] == ["relaxed_finish"]
+
+
+def test_stale_no_fault_review_does_not_claim_current_shot_is_clear():
+    shot = asset()
+    shot["model_assist"] = {"asset_revision": 3, "coaching": reviewed_without_faults()}
+    result = build_review(shot)
+    assert result["outcome"] == "measurements_only"
+    assert result["assessment_source"] == "measurements"
+    assert result["coverage"]["model_review"] == "stale"
+    assert result["overall"]["summary"] != shot["model_assist"]["coaching"]["overall_summary"]
+
+
+def test_coverage_distinguishes_observed_alignment_from_unseen_details():
+    shot = asset()
+    coaching = model_coaching([])
+    coaching["coverage"] = [
+        {
+            "rubric_id": "balanced_landing",
+            "status": "aligned",
+            "detail": bi("The visible landing is controlled."),
+            "evidence_frame_ids": ["f4", "f5"],
+        },
+        {
+            "rubric_id": "quiet_guide_hand",
+            "status": "not_visible",
+            "detail": bi("The hands cannot be separated in this view."),
+            "evidence_frame_ids": [],
+        },
+    ]
+    shot["model_assist"] = {"asset_revision": 4, "coaching": coaching}
+    result = build_review(shot)
+    assert result["outcome"] == "no_priority_issue"
+    assert result["coverage"]["dimension_coverage"] == "reported"
+    assert result["coverage"]["dimensions"] == coaching["coverage"]
+    coaching["coverage"][0]["status"] = "uncertain"
+    assert build_review(shot)["outcome"] == "limited_visibility"
+
+
+def test_coverage_requires_valid_evidence_for_assessed_dimensions():
+    coaching = model_coaching([])
+    dimension = {
+        "rubric_id": "balanced_landing",
+        "status": "aligned",
+        "detail": bi("The landing is controlled in this view."),
+        "evidence_frame_ids": [],
+    }
+    coaching["coverage"] = [dimension]
+    with pytest.raises(ValueError, match="requires frame evidence"):
+        validate_model_coaching(coaching, ["f4", "f5"])
+    dimension["evidence_frame_ids"] = ["f4", "f4"]
+    with pytest.raises(ValueError, match="multiple distinct frames"):
+        validate_model_coaching(coaching, ["f4", "f5"])
+    dimension["evidence_frame_ids"] = ["f4", "unseen"]
+    with pytest.raises(ValueError, match="frame evidence"):
+        validate_model_coaching(coaching, ["f4", "f5"])
+    dimension["evidence_frame_ids"] = ["f4", "f5"]
+    validate_model_coaching(coaching, ["f4", "f5"])
+    coaching["coverage"].append(deepcopy(dimension))
+    with pytest.raises(ValueError, match="duplicate coaching coverage"):
+        validate_model_coaching(coaching, ["f4", "f5"])

@@ -464,3 +464,86 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid va
   .settings-footer { padding: 14px 20px max(14px, env(safe-area-inset-bottom)); gap: 12px; }
   .settings-footer > span { max-width: 180px; font-size: 11px; }
 }
+/* Outcome and pose comparisons describe what was actually reviewed. */
+.review-empty { border: 1px solid #c8d3bf; padding: 25px; border-radius: 10px; }
+.review-empty h3 { font-size: 18px; line-height: 1.6; }
+.review-empty p { font-size: 13px; line-height: 1.85; color: var(--muted); }
+.review-empty.outcome-no_priority_issue { background: #eef4e8; border-color: #c8d8bd; }
+.review-empty.outcome-model_failed { background: #f7efe1; border-color: #ddc7a6; }
+.review-empty.outcome-limited_visibility { border-style: dashed; }
+.strength-line + .strength-line { margin-top: 12px; padding-top: 12px; border-top-color: #d6dfcc; }
+.strength-line .evidence-link { margin-top: 7px; font-size: 11px; }
+.pose .target-pose line { stroke: #a9ffcd; stroke-width: 4; stroke-dasharray: 8 5; stroke-linecap: round; filter: drop-shadow(0 1px 2px #102e24); }
+.pose .target-pose circle { fill: #163e32; stroke: #a9ffcd; stroke-width: 2; filter: drop-shadow(0 1px 2px #102e24); }
+.pose-guide { min-width: 0; align-self: start; padding-top: 28px; }
+.pose-guide > .eyebrow { font-size: 10px; letter-spacing: .7px; margin-bottom: 10px; }
+.pose-guide h3 { font-size: 19px; line-height: 1.6; margin: 0 0 15px; }
+.pose-legend { display: grid; gap: 9px; font-size: 12px; line-height: 1.5; margin: 14px 0 18px; }
+.pose-legend > span { display: flex; align-items: center; gap: 9px; }
+.pose-legend i { display: inline-block; width: 24px; flex-shrink: 0; }
+.pose-legend .own-key { border-top: 3px solid #ba7931; }
+.pose-legend .target-key { border-top: 3px dashed #258052; }
+.pose-explanation,.pose-status { font-size: 12px; line-height: 1.9; color: #526953; }
+.pose-status { border-left: 2px solid #b6c7a8; padding-left: 12px; margin: 18px 0; }
+.pose-phase { border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 7px; padding-top: 16px; font-size: 12px; }
+.pose-phase span { color: var(--muted); }
+.phase-jumps { display: flex; flex-wrap: wrap; gap: 7px; margin: 18px 0 12px; }
+.phase-jumps button { padding: 8px 12px; min-height: 40px; font-size: 12px; }
+.phase-jumps .phase-active { background: #dcebd4; border-color: #a6bd98; }
+.pose-scope,.pose-reference-source { font-size: 10px; line-height: 1.8; color: #76816f; }
+.pose-deltas { margin: 17px 0; }
+.pose-deltas > div { border-bottom: 1px solid var(--line); padding: 10px 0; }
+.pose-deltas dt { font-size: 11px; color: var(--muted); }
+.pose-deltas dd { font-size: 17px; font-variant-numeric: tabular-nums; margin: 6px 0 0; }
+.pose-deltas p { font-size: 11px; color: var(--muted); margin: 7px 0 0; }
+.has-reference .pose-guide { grid-column: 1/-1; padding-top: 10px; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; column-gap: 28px; }
+.has-reference .pose-guide > .eyebrow,.has-reference .pose-guide > h3 { grid-column: 1/-1; }
+.has-reference .pose-guide h3 { margin-bottom: 2px; }
+.has-reference .pose-guide .pose-legend { align-self: start; }
+.has-reference .pose-guide .pose-scope { grid-column: 1/-1; }
+.review-coverage { margin: 20px 0; }
+.review-coverage h3 { font-size: 14px; }
+.review-coverage ul { list-style: none; padding: 0; }
+.review-coverage li { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.review-coverage li > span { margin-left: auto; color: var(--muted); }
+.review-coverage li > p { flex-basis: 100%; color: var(--muted); margin: 0; }
+@media (max-width: 950px) {
+  .pose-guide { padding-top: 12px; border-top: 1px solid var(--line); }
+  .pose-guide h3 { font-size: 18px; }
+  .pose-legend { display: flex; flex-wrap: wrap; gap: 10px 18px; }
+  .pose-phase { max-width: 370px; }
+  .pose-deltas { display: flex; flex-wrap: wrap; gap: 15px 25px; }
+  .pose-deltas > div { flex: 1 1 150px; }
+}
+@media (max-width: 680px) {
+  .review-empty { padding: 21px 19px; }
+  .review-empty h3 { font-size: 18px; }
+  .pose-guide h3 { font-size: 18px; }
+  .pose-explanation,.pose-status { font-size: 12px; }
+  .pose-legend { gap: 9px 15px; font-size: 12px; }
+  .phase-jumps button { min-height: 44px; font-size: 12px; }
+  .pose-settings-link { min-height: 44px; }
+  .has-reference .pose-guide { display: block; }
+  .pose-scope { font-size: 11px; }
+}
+.pose-difference > p { color: var(--muted); font-size: 10px; margin: 17px 0 0; }
+.pose-difference .pose-deltas { margin-top: 0; }
+.pose-difference .pose-deltas dt { color: #355841; font-size: 13px; font-weight: 600; line-height: 1.8; }
+.pose-difference .pose-deltas dd { color: var(--muted); font-size: 11px; line-height: 1.8; }
+.pose-difference .pose-deltas dd > span { display: block; }
+.retry-unknown { font-size: 12px; line-height: 1.8; align-items: flex-start; background: #f7efe1; padding: 12px; border-radius: 7px; margin: 12px 0; }
+.retry-unknown input { flex-shrink: 0; margin-top: 5px; }
+.with-pose-guide { align-items: start; }
+.pose-guide > .phase-jumps { margin: 0 0 17px; }
+.video-main .transport { gap: 8px; }
+.video-main .transport button { padding: 10px 12px; }
+@media (max-width: 680px) { .video-main .transport { gap: 10px; } }
+.video-main > .pose-legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 2px 0 13px; font-size: 11px; }
+.video-layout.has-reference.with-target .video-reference .viewer { margin-top: 31px; }
+.has-reference .pose-guide .phase-jumps { grid-column: 1/-1; }
+@media (max-width: 680px) {
+  .has-reference .video-main { order: 0; }
+  .has-reference .pose-guide { order: 1; }
+  .has-reference .video-reference { order: 2; }
+  .video-layout.has-reference.with-target .video-reference .viewer { margin-top: 0; }
+}

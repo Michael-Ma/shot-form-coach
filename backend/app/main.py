@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import tempfile
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, Header, HTTPException, UploadFile
 from fastapi.responses import FileResponse
@@ -16,9 +18,15 @@ from .config import ROOT, Settings
 from .contracts import CreateAnalysis, ImportWorkbench, PhaseCorrection, ReportRequest
 from .db import Repository
 from .media import MediaError, import_workbench, ingest
+from .pose_comparison import build_pose_comparison
 from .provider import ensure_ready
 from .review_data import current_measurements
 from .worker import Worker
+
+
+@lru_cache(maxsize=32)
+def load_pose_track(path: str, modified_ns: int):
+    return json.loads(Path(path).read_text())
 
 
 def create_app(settings=None, start_worker=True):
@@ -70,7 +78,7 @@ def create_app(settings=None, start_worker=True):
         return {
             "status": "ok",
             "app": "shot-form-coach",
-            "version": "0.4.0",
+            "version": "0.5.0",
             "gemini_configured": bool(settings.api_key),
             "gemini_model": settings.model_id,
             "astra_model": settings.astra_model,
@@ -108,6 +116,30 @@ def create_app(settings=None, start_worker=True):
         if not a.get("tracks_path"):
             raise HTTPException(404, "not_analyzed")
         return json.loads(settings.resolve(a["tracks_path"]).read_text())
+
+    @api.get("/api/assets/{key}/pose-comparison")
+    def pose_comparison(
+        key: str,
+        mode: Literal["teaching", "reference"] = "teaching",
+        reference_asset_id: str | None = None,
+        assume_same_view: bool = False,
+    ):
+        a = current_measurements(settings, get("asset", key))
+        ref = current_measurements(settings, get("asset", reference_asset_id)) if reference_asset_id else None
+
+        def track(asset):
+            if not asset or not asset.get("tracks_path"):
+                return None
+            path = settings.resolve(asset["tracks_path"])
+            try:
+                return load_pose_track(str(path), path.stat().st_mtime_ns)
+            except (OSError, ValueError):
+                return None
+
+        result = build_pose_comparison(a, track(a), ref, track(ref), mode, assume_same_view)
+        result["reference_asset_id"] = ref["id"] if ref else None
+        result["reference_revision"] = ref["revision"] if ref else None
+        return result
 
     @api.post("/api/assets/upload")
     def upload(file: UploadFile):
@@ -159,6 +191,20 @@ def create_app(settings=None, start_worker=True):
             get("asset", key)
         if len(set(request.asset_ids)) != len(request.asset_ids):
             raise HTTPException(422, "duplicate_assets")
+        if request.config.allow_unknown_retry and len(request.asset_ids) != 1:
+            raise HTTPException(422, "retry_ack_single_shot_only")
+        if request.config.mode != "local" and not request.config.allow_unknown_retry:
+            provider = {"gemini": "gemini", "astra_api": "openai", "astra_codex": "codex"}[
+                request.config.mode
+            ]
+            if any(
+                receipt.get("asset_id") in request.asset_ids
+                and receipt.get("provider", "gemini") == provider
+                and receipt.get("status") in ("submitting", "request_unknown")
+                for previous in repo.all("job")
+                for receipt in previous.get("receipts", [])
+            ):
+                raise HTTPException(409, "unresolved_request_blocks_resubmission")
         try:
             ensure_ready(settings, request.config.mode)
         except ValueError as exc:

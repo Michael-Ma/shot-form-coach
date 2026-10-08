@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class AnalysisConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     mode: Literal["local", "gemini", "astra_api", "astra_codex"] = "local"
+    allow_unknown_retry: bool = False
     handedness: Literal["auto", "left", "right"] = "auto"
     shot_type: Literal["stationary_jump_shot", "set_shot", "unknown"] = "stationary_jump_shot"
     camera_view: Literal["oblique", "side", "front", "unknown"] = "oblique"

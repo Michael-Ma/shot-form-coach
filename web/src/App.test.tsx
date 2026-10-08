@@ -2,13 +2,14 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
+import type { PoseComparison } from "./PoseComparison";
 
 const text = (en: string, zh = `中 ${en}`) => ({ en, zh });
 const frames = [0, 1, 2].map((n) => ({ frame_id: `f${n}`, frame_index: n, time_us: n * 500000, source_time_us: 10000000 + n * 500000, source_frame_index: 20 + n }));
 const coaching = {
   version: "1", status: "reviewed", overall: { headline: text("Work on the finish", "先练结束动作"), summary: text("One supported observation.", "有一个可观察的调整方向。") },
   metrics: [{ id: "timing", label: text("Shooting rhythm", "出手节奏"), display_value: text("0.4 sec", "0.4 秒"), interpretation: text("Measured from loading to release."), status: "measured", evidence_frame_ids: ["f2"] }],
-  strengths: [], issues: [{ id: "finish", rubric_id: "finish", rank: 1, severity: "medium", confidence: "high", title: text("Hold a relaxed finish", "放松地完成随挥"), observation: text("The hand lowers in these frames."), standard_gap: text("Practice a relaxed extension."), why_it_matters: text("Compare repeatability."), action: text("Keep a natural finish."), drill: text("Review five attempts."), evidence_frame_ids: ["f1"], source_ids: [], basis: "measurement" }],
+  strengths: [] as { title: ReturnType<typeof text>; detail: ReturnType<typeof text>; evidence_frame_ids: string[] }[], issues: [{ id: "finish", rubric_id: "finish", rank: 1, severity: "medium", confidence: "high", title: text("Hold a relaxed finish", "放松地完成随挥"), observation: text("The hand lowers in these frames."), standard_gap: text("Practice a relaxed extension."), why_it_matters: text("Compare repeatability."), action: text("Keep a natural finish."), drill: text("Review five attempts."), evidence_frame_ids: ["f1"], source_ids: [], basis: "measurement" }],
   next_practice: { title: text("Five relaxed attempts"), instruction: text("Stay at the same location."), success_check: text("Review the finish together.") }, limitations: [], rubric_version: "1",
 };
 const makeAsset = (id: string, label: string) => ({
@@ -22,6 +23,8 @@ let fixtureAssets: ReturnType<typeof makeAsset>[];
 let fixtureHealth: { models_ready: boolean; gemini_configured: boolean; astra_api_configured: boolean; workbench_configured: boolean; codex: { ready: boolean; reason: string } };
 let fixtureRuns: { id: string; clip_count: number }[];
 let stored: Map<string, string>;
+let fixtureComparison: PoseComparison;
+const points = Array.from({ length: 33 }, (_, n) => ({ x: .45 + (n % 2) * .1, y: .2 + n * .015, visibility: .98 }));
 const openSettings = () => { fireEvent.click(screen.getByRole("button", { name: "Settings" })); return screen.getByRole("dialog", { name: "Settings" }); };
 const closeSettings = () => fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
 beforeEach(() => {
@@ -29,6 +32,10 @@ beforeEach(() => {
   vi.stubGlobal("localStorage", { getItem: (key: string) => stored.get(key) ?? null, setItem: vi.fn((key: string, value: string) => stored.set(key, value)), clear: () => stored.clear() });
   fixtureHealth = { models_ready: true, gemini_configured: false, astra_api_configured: false, workbench_configured: false, codex: { ready: false, reason: "codex_login_required" } };
   fixtureRuns = [];
+  fixtureComparison = {
+    version: "1", mode: "teaching", label: text("Teaching target illustration", "教学目标示意"), description: text("Arm extension illustration, fitted to your own segment lengths.", "按本人手臂长度绘制的伸展示意。"), source_type: "teaching_schematic", source_ids: [], coordinate_system: "normalized_own_frame", comparison_status: "available",
+    frames: frames.map((frame, n) => ({ frame_index: n, phase: n === 0 ? "outside_phase" : n === 1 ? "release" : "follow_through", available: n > 0, reason: n === 0 ? "outside_phase" : undefined, target_landmarks: points.map((p) => ({ ...p, x: p.x + .1 })), connections: [[12, 14], [14, 16]], own_evidence: { ...frame, asset_id: "b" }, deltas: [] })),
+  };
   Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: function(this: HTMLDialogElement) { this.setAttribute("open", ""); this.querySelector<HTMLButtonElement>(".settings-close")?.focus(); } });
   Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value: function(this: HTMLDialogElement) { this.removeAttribute("open"); this.dispatchEvent(new Event("close")); } });
   fixtureAssets = [makeAsset("a", "Shot A"), makeAsset("b", "Shot B")];
@@ -40,7 +47,8 @@ beforeEach(() => {
     if (path === "/api/workbench/runs") return { ok: true, json: async () => fixtureRuns };
     if (path === "/api/health") return { ok: true, json: async () => fixtureHealth };
     if (path === "/api/analyses" && options?.method === "POST") return { ok: true, json: async () => ({}) };
-    if (path.includes("/tracks")) return { ok: true, json: async () => ({ frames: [] }) };
+    if (path.includes("/tracks")) return { ok: true, json: async () => ({ frames: frames.map(() => ({ width: 640, height: 480, landmarks: points, person_box: null, ball: null })) }) };
+    if (path.includes("/pose-comparison")) return { ok: true, json: async () => fixtureComparison };
     if (path === "/api/assets/b/reports" && options?.method === "POST") {
       const body = JSON.parse(options.body as string);
       fixtureAssets = fixtureAssets.map((a) => a.id === "b" ? { ...a, report_request: { reference_asset_id: body.reference_asset_id, assume_same_view: body.assume_same_view }, report: { ...a.report, id: "new-matching-report", reference_id: body.reference_asset_id, reference_revision: 2, locale: body.locale } } : a);
@@ -118,7 +126,7 @@ describe("unified settings drawer", () => {
     expect(screen.queryByRole("combobox")).toBeNull();
     expect(document.querySelector(".sidebar")?.querySelector("select,input,details")).toBeNull();
     const dialog = openSettings();
-    for (const label of ["Analysis method", "Shooting hand", "Camera view", "Shot context", "Compare with another of your shots", "Playback speed"]) {
+    for (const label of ["Analysis method", "Shooting hand", "Camera view", "Shot context", "Compare with another of your shots", "Pose comparison target", "Playback speed"]) {
       expect(within(dialog).getByRole("combobox", { name: label })).toBeTruthy();
     }
     expect(within(dialog).getByRole("checkbox", { name: "Focus on movement" })).toBeTruthy();
@@ -231,5 +239,144 @@ describe("unified settings drawer", () => {
     expect((screen.getByLabelText("Shooting hand") as HTMLSelectElement).value).toBe("auto");
     expect((screen.getByLabelText("Focus on movement") as HTMLInputElement).checked).toBe(true);
     expect((screen.getByLabelText("Pose overlay") as HTMLInputElement).checked).toBe(false);
+  });
+});
+
+
+describe("review outcomes and aligned pose comparison", () => {
+  it("keeps a completed model review with no issues distinct from insufficient evidence", async () => {
+    fixtureAssets = fixtureAssets.map((a) => ({ ...a, coaching: {
+      ...coaching, assessment_source: "model", outcome: "no_priority_issue", issues: [],
+      empty_state: { title: text("No correction needs priority in the observed phases"), detail: text("Check more shots for consistency; this is not an all-clear for unobserved technique.") },
+      strengths: [
+        { title: text("Continuous ball lift"), detail: text("The ball rises continuously in the reviewed frames."), evidence_frame_ids: ["f1"] },
+        { title: text("Balanced landing"), detail: text("The landing stays within the visible base."), evidence_frame_ids: ["f2"] },
+      ],
+    } }));
+    render(<App />);
+    await screen.findByText("No correction needs priority in the observed phases");
+    expect(screen.queryByText("No supported correction to rank yet")).toBeNull();
+    expect(screen.getByTestId("review-empty").getAttribute("data-outcome")).toBe("no_priority_issue");
+    expect(screen.getByText(/Keep doing · Continuous ball lift/)).toBeTruthy();
+    expect(screen.getByText(/Keep doing · Balanced landing/)).toBeTruthy();
+    fireEvent.click(within(screen.getByTestId("coaching-summary")).getAllByRole("button", { name: /Show this moment/ })[1]);
+    expect(document.querySelector(".viewer img")?.getAttribute("src")).toBe("/api/assets/b/frames/2");
+  });
+  it("shows a model failure as a failed review without claiming the video cannot support findings", async () => {
+    fixtureAssets = fixtureAssets.map((a) => ({ ...a, model_error: "model_reply_invalid", coaching: { ...coaching, outcome: "model_failed", issues: [], status: "limited" } }));
+    render(<App />);
+    await screen.findByText("The model review did not complete");
+    expect(screen.queryByText("No supported correction to rank yet")).toBeNull();
+    expect(screen.getByText(/Local movement measurements are available/)).toBeTruthy();
+    expect(screen.getAllByTestId("coaching-metric")).toHaveLength(1);
+    expect(screen.queryByText(/This is a movement summary. Choose Gemini/)).toBeNull();
+  });
+  it("draws a labeled target on the own video, jumps phases, and reuses one geometry request while scrubbing", async () => {
+    stored.set("sfc-pose", "true");
+    render(<App />);
+    await screen.findByText("Arm extension illustration, fitted to your own segment lengths.");
+    expect(screen.getByTestId("pose-unavailable").textContent).toContain("target appears around release");
+    expect(screen.queryByTestId("target-pose")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Release ↗" }));
+    expect(await screen.findByTestId("target-pose")).toBeTruthy();
+    const target = screen.getByTestId("target-pose");
+    expect(target.querySelectorAll("line")).toHaveLength(2);
+    expect(target.closest(".video-main")).toBeTruthy();
+    expect(screen.getByLabelText("Pose legend").textContent).toContain("You");
+    fireEvent.click(screen.getByRole("button", { name: "Follow-through ↗" }));
+    expect(document.querySelector(".viewer img")?.getAttribute("src")).toBe("/api/assets/b/frames/2");
+    fireEvent.change(screen.getByLabelText("Video position"), { target: { value: "1" } });
+    expect(vi.mocked(fetch).mock.calls.filter(([path]) => String(path).includes("/pose-comparison"))).toHaveLength(1);
+    expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+  });
+  it("does not display stale target geometry when selecting a blocked reference or changing shots", async () => {
+    stored.set("sfc-pose", "true");
+    render(<App />);
+    await screen.findByText("Arm extension illustration, fitted to your own segment lengths.");
+    fireEvent.click(screen.getByRole("button", { name: "Release ↗" }));
+    expect(await screen.findByTestId("target-pose")).toBeTruthy();
+    fixtureComparison = { ...fixtureComparison, mode: "reference", label: text("Selected reference"), comparison_status: "unavailable", reason: "view_unverified", frames: [] };
+    openSettings();
+    fireEvent.change(screen.getByLabelText("Pose comparison target"), { target: { value: "reference" } });
+    fireEvent.change(screen.getByLabelText("Compare with another of your shots"), { target: { value: "a" } });
+    closeSettings();
+    await screen.findByText("Confirm that both clips share the same fixed camera view in Comparison settings.");
+    expect(screen.queryByTestId("target-pose")).toBeNull();
+    expect(vi.mocked(fetch).mock.calls.some(([path]) => String(path).includes("mode=reference&reference_asset_id=a&assume_same_view=false"))).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /Shot A/ }));
+    await waitFor(() => expect(document.querySelector(".viewer img")?.getAttribute("src")).toBe("/api/assets/a/frames/0"));
+    expect(screen.queryByTestId("target-pose")).toBeNull();
+    expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+  });
+  it("keeps comparison configuration in the drawer and respects an explicit hidden overlay preference", async () => {
+    stored.set("sfc-pose", "false");
+    render(<App />);
+    await screen.findByText("Work on the finish");
+    expect(screen.queryByRole("combobox", { name: "Pose comparison target" })).toBeNull();
+    expect(vi.mocked(fetch).mock.calls.some(([path]) => String(path).includes("/pose-comparison"))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Pose settings ↗" }));
+    const dialog = screen.getByRole("dialog", { name: "Settings" });
+    expect((within(dialog).getByRole("checkbox", { name: "Pose overlay" }) as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "Pose overlay" }));
+    closeSettings();
+    await screen.findByText("Arm extension illustration, fitted to your own segment lengths.");
+    openSettings();
+    fireEvent.change(within(dialog).getByRole("combobox", { name: "Pose comparison target" }), { target: { value: "none" } });
+    closeSettings();
+    expect(screen.queryByTestId("target-pose")).toBeNull();
+    expect(screen.getByText(/Your pose is visible. Choose a teaching target/)).toBeTruthy();
+    expect(stored.get("sfc-pose-target")).toBe("none");
+    expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+  });
+});
+
+
+describe("explicit retry of an unknown model result", () => {
+  it("requires an unchecked per-shot acknowledgement and never applies it to batch analysis", async () => {
+    stored.set("sfc-mode", "gemini");
+    fixtureHealth.gemini_configured = true;
+    fixtureAssets = fixtureAssets.map((a) => ({ ...a, model_error: "request_unknown", analysis_config: { mode: "gemini" } }));
+    render(<App />);
+    await screen.findByText("Work on the finish");
+    openSettings();
+    const acknowledgement = screen.getByRole("checkbox", { name: /The last result is unknown/ }) as HTMLInputElement;
+    expect(acknowledgement.checked).toBe(false);
+    expect((screen.getByRole("button", { name: /Analyze this shot/, hidden: true }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Confirm in Settings whether to submit this shot again.")).toBeTruthy();
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+    fireEvent.click(acknowledgement);
+    closeSettings();
+    expect((screen.getByRole("button", { name: /Analyze this shot/ }) as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByText("Confirm in Settings whether to submit this shot again.")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Analyze this shot/ }));
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([path]) => path === "/api/analyses")).toBe(true));
+    const firstRequest = vi.mocked(fetch).mock.calls.find(([path]) => path === "/api/analyses")!;
+    expect(JSON.parse(firstRequest[1]!.body as string)).toMatchObject({ asset_ids: ["b"], config: { allow_unknown_retry: true } });
+    await waitFor(() => expect((screen.getByRole("button", { name: /Analyze this shot/ }) as HTMLButtonElement).disabled).toBe(true));
+    openSettings();
+    expect((screen.getByRole("checkbox", { name: /The last result is unknown/ }) as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(screen.getByRole("checkbox", { name: /The last result is unknown/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Analyze all shots/ }));
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.filter(([path]) => path === "/api/analyses")).toHaveLength(2));
+    const batch = vi.mocked(fetch).mock.calls.filter(([path]) => path === "/api/analyses")[1];
+    expect(JSON.parse(batch[1]!.body as string).config.allow_unknown_retry).toBeUndefined();
+  });
+  it("clears retry acknowledgement on mode changes and hides it for a known failure", async () => {
+    stored.set("sfc-mode", "gemini");
+    fixtureHealth.gemini_configured = true;
+    fixtureAssets = fixtureAssets.map((a) => ({ ...a, model_error: a.id === "b" ? "request_unknown" : "provider_bad_request", analysis_config: { mode: "gemini" } }));
+    render(<App />);
+    await screen.findByText("Work on the finish");
+    openSettings();
+    fireEvent.click(screen.getByRole("checkbox", { name: /The last result is unknown/ }));
+    fireEvent.change(screen.getByLabelText("Analysis method"), { target: { value: "local" } });
+    expect(screen.queryByRole("checkbox", { name: /The last result is unknown/ })).toBeNull();
+    fireEvent.change(screen.getByLabelText("Analysis method"), { target: { value: "gemini" } });
+    expect((screen.getByRole("checkbox", { name: /The last result is unknown/ }) as HTMLInputElement).checked).toBe(false);
+    closeSettings();
+    fireEvent.click(screen.getByRole("button", { name: /Shot A/ }));
+    openSettings();
+    expect(screen.queryByRole("checkbox", { name: /The last result is unknown/ })).toBeNull();
+    expect(vi.mocked(fetch).mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
   });
 });

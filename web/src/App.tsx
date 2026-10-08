@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { PoseComparisonGuide, PoseLegend, TargetPose, type PoseComparison, type ComparisonFrame, type ComparisonMode } from "./PoseComparison";
 
 type Bilingual = { en: string; zh: string };
 type CoachingIssue = {
@@ -10,6 +11,9 @@ type CoachingIssue = {
 };
 type Coaching = {
   version: string; assessment_source?: "model" | "measurements"; status: "reviewed" | "limited" | "awaiting_analysis";
+  outcome?: "issues_found" | "no_priority_issue" | "limited_visibility" | "model_failed" | "measurements_only" | "awaiting_analysis";
+  empty_state?: { title: Bilingual; detail: Bilingual };
+  coverage?: { model_review: string; dimension_coverage: string; available_metrics: number; total_metrics: number; withheld_dimensions: string[]; dimensions: { rubric_id: string; status: string; detail: Bilingual; evidence_frame_ids: string[] }[] };
   overall: { headline: Bilingual; summary: Bilingual };
   metrics: { id: string; label: Bilingual; display_value: Bilingual; interpretation: Bilingual; status: "measured" | "unavailable"; evidence_frame_ids: string[] }[];
   strengths: { title: Bilingual; detail: Bilingual; evidence_frame_ids: string[] }[];
@@ -507,9 +511,11 @@ const post = (body: unknown): RequestInit => ({
 function Pose({
   frame,
   show,
+  target,
 }: {
   frame: TrackFrame | undefined;
   show: boolean;
+  target?: ComparisonFrame;
 }) {
   if (!show || !frame) return null;
   const valid = (p: Point) =>
@@ -543,6 +549,7 @@ function Pose({
           />
         ) : null,
       )}
+      <TargetPose frame={target} width={frame.width} height={frame.height} />
       {frame.ball && (
         <circle
           className="ball"
@@ -700,6 +707,17 @@ const REVIEW_ZH: Record<string, string> = {
   referenceUsed: "使用的参照", loadingShots: "正在加载你的投篮…", setup: "需要配置", exportsLanguage: "已保存报告语言",
 };
 const SETTINGS_EN: Record<string, string> = {
+  confirmUnknownRetry: "Confirm in Settings whether to submit this shot again.",
+  retryUnknown: "The last result is unknown. Allow resubmitting this shot (a new model charge may apply).",
+  provider_bad_request: "The model rejected the request format. Update the app before trying again.", provider_auth_error: "The model could not authenticate. Check the configured account or API key.", provider_model_unavailable: "This model is not available to the configured account.", provider_rate_limited: "The provider's usage or rate limit was reached. Try again after it resets.", provider_rejected: "The model provider rejected this request.",
+  poseTarget: "Pose comparison target", poseNone: "Your pose only", poseTeaching: "Teaching target illustration", poseReference: "Selected personal reference",
+  poseTargetHelp: "Teaching targets illustrate an extended shooting arm. Personal references use the selected shot and need a matching camera view.",
+  noPriorityIssue: "No priority correction found in this clip", noPriorityIssueHelp: "The review found visible strengths without a supported correction to rank. Keep checking the unobserved parts and consistency across more shots.",
+  modelFailedTitle: "The model review did not complete", modelFailedHelp: "Local movement measurements are available. Check the model message and retry analysis to get a coaching review.",
+  measurementsOnlyTitle: "Movement measured; coaching review not run", measurementsOnlyHelp: "Choose Gemini or Astra in Settings and analyze to review visible technique and practice priorities.",
+  coordinated_rise: "Rise and ball lift", balanced_landing: "Balance and landing", comfortable_release: "Release and extension", quiet_guide_hand: "Support-hand release", relaxed_finish: "Finish",
+  aligned: "Teaching goal observed", needs_review: "Needs attention", not_visible: "Not visible", uncertain: "Uncertain",
+  reviewCoverage: "What was reviewed", issue_found: "Focus identified", no_issue_observed: "No issue observed", not_assessed: "Not assessed", insufficient_evidence: "Evidence limited",
   settingsTitle: "Settings", settingsHelp: "Everything you need for your next review.", closeSettings: "Close settings", doneSettings: "Back to review",
   analysisSection: "Analysis", importSection: "Add shots", comparisonSection: "Comparison", playbackSection: "Playback", languageSection: "Language",
   nextAnalysis: "These choices apply when you next analyze. Changing a setting does not rerun a review.",
@@ -716,6 +734,17 @@ const SETTINGS_EN: Record<string, string> = {
   settingsEmpty: "Open Settings to add your first shot", playbackNow: "Playback", comparisonResults: "Personal comparison",
 };
 const SETTINGS_ZH: Record<string, string> = {
+  confirmUnknownRetry: "请在设置中确认是否再次提交这球。",
+  retryUnknown: "上次结果未知，允许再次提交这球（可能产生新的调用费用）。",
+  provider_bad_request: "模型服务拒绝了请求格式，请更新应用后再尝试。", provider_auth_error: "模型认证失败，请检查所配置的账号或 API key。", provider_model_unavailable: "当前账号无法使用这个模型。", provider_rate_limited: "已达到模型服务的额度或频率限制，请恢复后再试。", provider_rejected: "模型服务拒绝了这次请求。",
+  poseTarget: "姿态对比目标", poseNone: "只看本人姿态", poseTeaching: "教学目标示意", poseReference: "所选个人参照",
+  poseTargetHelp: "教学目标示意伸展的投篮手臂。个人参照使用所选的另一球，并需要相同拍摄视角。",
+  noPriorityIssue: "这段视频中未发现需优先纠正的问题", noPriorityIssueHelp: "复盘看到了可保留的动作，但没有充分依据提出优先纠正项。仍需观察未覆盖的部分，以及多次投篮的一致性。",
+  modelFailedTitle: "这次模型复盘未完成", modelFailedHelp: "本地动作数据仍然可用。查看模型提示并重新分析，才能获得综合评价。",
+  measurementsOnlyTitle: "已测量动作，尚未进行综合复盘", measurementsOnlyHelp: "在设置中选择 Gemini 或 Astra 后点击分析，可检查可见的技术问题和练习重点。",
+  coordinated_rise: "起身与举球衔接", balanced_landing: "平衡与落地", comfortable_release: "出手与伸展", quiet_guide_hand: "辅助手离球", relaxed_finish: "随挥与收势",
+  aligned: "观察到教学目标", needs_review: "值得关注", not_visible: "看不清", uncertain: "尚不确定",
+  reviewCoverage: "本次观察范围", issue_found: "发现调整方向", no_issue_observed: "未见明显问题", not_assessed: "尚未评估", insufficient_evidence: "证据不足",
   settingsTitle: "设置", settingsHelp: "下一次复盘需要的选项，都在这里。", closeSettings: "关闭设置", doneSettings: "回到复盘",
   analysisSection: "分析", importSection: "添加投篮", comparisonSection: "对比", playbackSection: "播放", languageSection: "语言",
   nextAnalysis: "这些选项用于下一次分析。修改设置不会自动重新分析。",
@@ -768,12 +797,17 @@ export default function App() {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [showPose, setShowPose] = useState(() => savedChoice("sfc-pose", ["true", "false"], "false") === "true");
+  const [poseMode, setPoseMode] = useState<ComparisonMode>(() => savedChoice("sfc-pose-target", ["none", "teaching", "reference"], "teaching") as ComparisonMode);
+  const [poseComparison, setPoseComparison] = useState<PoseComparison>();
+  const [poseLoading, setPoseLoading] = useState(false);
+  const [poseFailed, setPoseFailed] = useState(false);
   const [last, setLast] = useState<number | null>(null);
   const [first, setFirst] = useState<number | null>(null);
   const [mode, setMode] = useState(() => savedChoice("sfc-mode", ["local", "gemini", "astra_codex", "astra_api"], "local"));
   const [hand, setHand] = useState(() => savedChoice("sfc-hand", ["auto", "right", "left"], "auto"));
   const [view, setView] = useState(() => savedChoice("sfc-view", ["oblique", "side", "front", "unknown"], "oblique"));
   const [shot, setShot] = useState(() => savedChoice("sfc-shot", ["stationary_jump_shot", "set_shot", "unknown"], "stationary_jump_shot"));
+  const [allowUnknownRetry, setAllowUnknownRetry] = useState(false);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
@@ -784,8 +818,15 @@ export default function App() {
   const settingsTrigger = useRef<HTMLButtonElement>(null);
   const settingsOpener = useRef<HTMLElement | null>(null);
   const settingsBody = useRef<HTMLDivElement>(null);
+  const settingsDestination = useRef("");
   function openSettings() {
+    settingsDestination.current = "";
     settingsOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setSettingsOpen(true);
+  }
+  function openPoseSettings() {
+    settingsOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    settingsDestination.current = showPose ? "comparison" : "playback";
     setSettingsOpen(true);
   }
   function closeSettings() { setSettingsOpen(false); }
@@ -811,7 +852,11 @@ export default function App() {
   const report = chosen?.report;
   const coaching = chosen?.coaching || (report?.asset_revision === chosen?.revision ? report?.coaching : undefined);
   const hasVisualReview = coaching?.assessment_source === "model";
+  const unknownRetryAvailable = !!chosen?.model_error && ["request_unknown", "unresolved_request_blocks_resubmission", "interrupted_request_unknown"].includes(chosen.model_error) && mode === chosen.analysis_config?.mode;
   const issues = [...(coaching?.issues || [])].sort((a, b) => a.rank - b.rank).slice(0, 3);
+  const reviewOutcome = coaching?.outcome || (chosen?.model_error ? "model_failed" : issues.length ? "issues_found" : hasVisualReview && coaching?.status === "reviewed" ? "no_priority_issue" : coaching?.status === "limited" ? "limited_visibility" : !hasVisualReview ? "measurements_only" : "limited_visibility");
+  const emptyTitle = cText(coaching?.empty_state?.title) || t(reviewOutcome === "no_priority_issue" ? "noPriorityIssue" : reviewOutcome === "model_failed" ? "modelFailedTitle" : reviewOutcome === "measurements_only" ? "measurementsOnlyTitle" : "noIssues");
+  const emptyDetail = cText(coaching?.empty_state?.detail) || t(reviewOutcome === "no_priority_issue" ? "noPriorityIssueHelp" : reviewOutcome === "model_failed" ? "modelFailedHelp" : reviewOutcome === "measurements_only" ? "measurementsOnlyHelp" : "noIssuesHelp");
   const reportReference = report?.reference_id ?? chosen?.report_request?.reference_asset_id ?? "";
   const reportMatches = !!report && report.asset_revision === chosen?.revision && reportReference === reference &&
     (!ref || report.reference_revision === ref.revision) &&
@@ -850,19 +895,34 @@ export default function App() {
     if (reference) void api<{ frames: TrackFrame[] }>(`/assets/${reference}/tracks`).then((r) => { if (live) setRefTracks(r.frames); }).catch(() => {});
     return () => { live = false; };
   }, [reference, ref?.revision]);
+  useEffect(() => {
+    let live = true;
+    setPoseComparison(undefined); setPoseFailed(false); setPoseLoading(false);
+    if (selected && ready && showPose && poseMode !== "none") {
+      setPoseLoading(true);
+      const params = new URLSearchParams({ mode: poseMode });
+      if (reference) params.set("reference_asset_id", reference);
+      params.set("assume_same_view", String(sameView));
+      void api<PoseComparison>(`/assets/${selected}/pose-comparison?${params}`).then((value) => { if (live) setPoseComparison(value); })
+        .catch(() => { if (live) setPoseFailed(true); }).finally(() => { if (live) setPoseLoading(false); });
+    }
+    return () => { live = false; };
+  }, [selected, chosen?.revision, ready, showPose, poseMode, reference, ref?.revision, sameView]);
   useEffect(() => { document.documentElement.lang = lang; savePreference("sfc-lang", lang); setEvidenceLabel(""); }, [lang]);
   useEffect(() => { savePreference("sfc-mode", mode); }, [mode]);
+  useEffect(() => { setAllowUnknownRetry(false); }, [selected, mode]);
   useEffect(() => { if (video.current) video.current.playbackRate = Number(speed); }, [speed, selected]);
   useEffect(() => {
     savePreference("sfc-hand", hand); savePreference("sfc-view", view); savePreference("sfc-shot", shot);
-    savePreference("sfc-speed", speed); savePreference("sfc-focus", String(focused)); savePreference("sfc-pose", String(showPose));
-  }, [hand, view, shot, speed, focused, showPose]);
+    savePreference("sfc-speed", speed); savePreference("sfc-focus", String(focused)); savePreference("sfc-pose", String(showPose)); savePreference("sfc-pose-target", poseMode);
+  }, [hand, view, shot, speed, focused, showPose, poseMode]);
   useEffect(() => {
     const dialog = settingsDialog.current;
     if (!dialog) return;
     if (settingsOpen) {
       dialog.showModal();
       if (settingsBody.current) settingsBody.current.scrollTop = 0;
+      if (settingsDestination.current) document.getElementById(`settings-${settingsDestination.current}`)?.scrollIntoView({ block: "start" });
       const previousOverflow = document.body.style.overflow;
       document.body.style.overflow = "hidden";
       return () => { document.body.style.overflow = previousOverflow; };
@@ -878,12 +938,17 @@ export default function App() {
   const refAnchor = ref ? anchor(ref) : null;
   const relative = chosen ? (chosen.frame_index[index]?.time_us || 0) - (ownAnchor ?? chosen.duration_us / 2) : 0;
   const refIndex = ref ? nearest(ref, (refAnchor ?? ref.duration_us / 2) + relative) : 0;
+  const comparisonFrame = poseComparison?.frames.find((frame) => frame.frame_index === index);
+  const releaseJumpFrame = poseComparison?.recommended_frame_index ?? (chosen && ownAnchor !== null ? nearest(chosen, ownAnchor) : undefined);
+  const followThroughJumpFrame = poseComparison?.frames.find((frame) => frame.phase === "follow_through" && frame.available)?.frame_index
+    ?? (chosen && ownAnchor !== null && chosen.duration_us >= ownAnchor + 300000 ? nearest(chosen, ownAnchor + 300000) : undefined);
   async function action(fn: () => Promise<void>) {
     setBusy(true); setError("");
     try { await fn(); await refresh(); return true; } catch (e) { setError((e as Error).message); if (settingsBody.current) settingsBody.current.scrollTop = 0; return false; } finally { setBusy(false); }
   }
   async function analyze(ids: string[]) {
-    await api("/analyses", { ...post({ asset_ids: ids, config: { mode, handedness: hand, camera_view: view, shot_type: shot, locale: lang, max_model_calls: 6 } }), headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() } });
+    await api("/analyses", { ...post({ asset_ids: ids, config: { mode, handedness: hand, camera_view: view, shot_type: shot, locale: lang, max_model_calls: 6, ...(ids.length === 1 && ids[0] === selected && unknownRetryAvailable && allowUnknownRetry ? { allow_unknown_retry: true } : {}) } }), headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() } });
+    setAllowUnknownRetry(false);
   }
   function seek(n: number) {
     if (!chosen?.frame_index.length) return;
@@ -914,7 +979,7 @@ export default function App() {
   const modeReady = mode === "local" || (mode === "gemini" ? !!health?.gemini_configured : mode === "astra_codex" ? !!health?.codex?.ready : !!health?.astra_api_configured);
   const modeProblem = mode === "gemini" ? "noKey" : mode === "astra_codex" ? health?.codex?.reason || "codex_not_installed" : "openai_key_missing";
   const canStart = !generating && health?.models_ready !== false && modeReady;
-  const canAnalyze = canStart && !!chosen;
+  const canAnalyze = canStart && !!chosen && !(unknownRetryAvailable && !allowUnknownRetry);
   const methodSelect = <label className="method-select">{t("mode")}<select value={mode} onChange={(e) => setMode(e.target.value)} disabled={generating}>
     <option value="local">{t("local")}</option><option value="gemini" disabled={!health?.gemini_configured}>{t("gemini")}{!health?.gemini_configured ? ` · ${t("setup")}` : ""}</option><option value="astra_codex" disabled={!health?.codex?.ready}>{t("astra_codex")}{!health?.codex?.ready ? ` · ${t("setup")}` : ""}</option><option value="astra_api" disabled={!health?.astra_api_configured}>{t("astra_api")}{!health?.astra_api_configured ? ` · ${t("setup")}` : ""}</option>
   </select></label>;
@@ -938,21 +1003,21 @@ export default function App() {
         <div className="workspace">
           {error && !settingsOpen && <div className="error" role="alert">{t(error)}</div>}
           {!loaded ? <div className="empty" role="status">{t("loadingShots")}</div> : chosen ? <>
-            <div className="review-heading"><div><span className="eyebrow">{t("review")}</span><h1>{chosen.label}</h1></div><div className="review-actions"><span className="analysis-method-summary">{t("selectedMethod")} · <strong>{t(mode)}</strong></span><button className="primary analyze-button" disabled={!canAnalyze} onClick={() => void action(() => analyze([selected]))}>{analyzingChosen ? t("analyzing") : t("analyze")} <span aria-hidden="true">↗</span></button>{!modeReady && <p className="mode-note">{t(modeProblem)}</p>}{health?.models_ready === false && <p className="mode-note">{t("missingModels")}</p>}</div></div>
+            <div className="review-heading"><div><span className="eyebrow">{t("review")}</span><h1>{chosen.label}</h1></div><div className="review-actions"><span className="analysis-method-summary">{t("selectedMethod")} · <strong>{t(mode)}</strong></span><button className="primary analyze-button" disabled={!canAnalyze} onClick={() => void action(() => analyze([selected]))}>{analyzingChosen ? t("analyzing") : t("analyze")} <span aria-hidden="true">↗</span></button>{unknownRetryAvailable && !allowUnknownRetry && <p className="mode-note">{t("confirmUnknownRetry")}</p>}{!modeReady && <p className="mode-note">{t(modeProblem)}</p>}{health?.models_ready === false && <p className="mode-note">{t("missingModels")}</p>}</div></div>
             {analyzingChosen ? <section className="coaching-summary processing" role="status"><span className="eyebrow">{t("analyzing")}</span><h2>{t("analyzingTitle")}</h2><p>{t("analyzingHelp")}</p><progress aria-label={t("analyzing")} /></section> : coaching && coaching.status !== "awaiting_analysis" ? <>
               <section className="coaching-summary" ref={summarySection} tabIndex={-1} data-testid="coaching-summary" aria-label={t("overview")}>
                 <div className="summary-kicker"><span className="eyebrow">{t("overview")}</span><span className={`pill ${coaching.status === "limited" ? "amber" : ""}`}>{t(coaching.status === "limited" ? "limited" : hasVisualReview ? "visualReview" : "movementSummary")}</span></div>
-                <h2>{cText(coaching.overall.headline)}</h2><p>{cText(coaching.overall.summary)}</p>{!hasVisualReview && <div className="review-upgrade-note">{t("upgradeReview")}</div>}
-                {coaching.strengths.length > 0 && <div className="strength-line"><span className="strength-check" aria-hidden="true">✓</span><div><strong>{t("strengths")} · {cText(coaching.strengths[0].title)}</strong><span>{cText(coaching.strengths[0].detail)}</span></div></div>}
+                <h2>{cText(coaching.overall.headline)}</h2><p>{cText(coaching.overall.summary)}</p>{!hasVisualReview && reviewOutcome !== "model_failed" && <div className="review-upgrade-note">{t("upgradeReview")}</div>}
+                {coaching.strengths.slice(0, issues.length ? 1 : 3).map((strength, strengthIndex) => <div className="strength-line" key={strengthIndex}><span className="strength-check" aria-hidden="true">✓</span><div><strong>{t("strengths")} · {cText(strength.title)}</strong><span>{cText(strength.detail)}</span>{!issues.length && evidenceButton(strength.evidence_frame_ids, cText(strength.title))}</div></div>)}
               </section>
               <div className={`coaching-layout ${issues.length ? "" : "no-priorities"}`}>
-                <section className="priorities" aria-labelledby="priorities-heading"><div className="section-heading"><h2 id="priorities-heading">{t("priorities")}</h2>{issues.length > 0 && <span className="count">{String(issues.length).padStart(2, "0")}</span>}</div><p className="section-help">{t("priorityNote")}</p>
+                <section className="priorities" aria-labelledby="priorities-heading"><div className="section-heading"><h2 id="priorities-heading">{t("priorities")}</h2>{issues.length > 0 && <span className="count">{String(issues.length).padStart(2, "0")}</span>}</div>{issues.length > 0 && <p className="section-help">{t("priorityNote")}</p>}
                   {issues.length ? <ol className="issue-list">{issues.map((issue, i) => <li key={issue.id} className={`issue-card severity-${issue.severity}`} data-testid="issue-card">
                     <div className="issue-heading"><span className="rank">{String(i + 1).padStart(2, "0")}</span><div><div className="issue-meta"><span className="priority-label">{t(issue.severity)}</span><span>{t("confidence")} · {t(`confidence_${issue.confidence}`)}</span></div><h3>{cText(issue.title)}</h3></div></div>
                     <p className="issue-observation">{cText(issue.observation)}</p><div className="standard-gap"><span>{t("standardGap")}</span><p>{cText(issue.standard_gap)}</p></div>
                     <p className="issue-action"><strong>{t("tryThis")}</strong>{cText(issue.action)}</p>
                     <div className="issue-bottom">{evidenceButton(issue.evidence_frame_ids, cText(issue.title))}<details><summary>{t("detail")}</summary><div><h4>{t("why")}</h4><p>{cText(issue.why_it_matters)}</p><h4>{t("drill")}</h4><p>{cText(issue.drill)}</p></div></details></div>
-                  </li>)}</ol> : <div className="insufficient"><span className="evidence-icon" aria-hidden="true">◌</span><h3>{t("noIssues")}</h3><p>{t("noIssuesHelp")}</p><button className="text-button" onClick={() => evidenceSection.current?.scrollIntoView({ behavior: scrollBehavior() })}>{t("evidenceSection")} ↗</button></div>}
+                  </li>)}</ol> : <div className={`review-empty outcome-${reviewOutcome}`} data-testid="review-empty" data-outcome={reviewOutcome}><span className="evidence-icon" aria-hidden="true">{reviewOutcome === "no_priority_issue" ? "✓" : reviewOutcome === "model_failed" ? "↻" : "◌"}</span><h3>{emptyTitle}</h3><p>{emptyDetail}</p><button className="text-button" onClick={() => evidenceSection.current?.scrollIntoView({ behavior: scrollBehavior() })}>{t("evidenceSection")} ↗</button></div>}
                 </section>
                 <aside className="practice-card" aria-labelledby="practice-heading"><span className="eyebrow">{t("nextPractice")}</span><span className="practice-mark" aria-hidden="true">↗</span><h2 id="practice-heading">{cText(coaching.next_practice.title)}</h2><p>{cText(coaching.next_practice.instruction)}</p><div className="success-check"><strong>{t("success")}</strong><p>{cText(coaching.next_practice.success_check)}</p></div></aside>
               </div>
@@ -963,22 +1028,22 @@ export default function App() {
               <div className="section-heading"><h2 id="evidence-heading">{t("evidenceSection")}</h2><button className="text-button back-review" onClick={() => { summarySection.current?.scrollIntoView({ behavior: scrollBehavior() }); summarySection.current?.focus({ preventScroll: true }); }}>{t("returnReview")} ↑</button></div>
               <p className="section-help">{t("evidenceNote")}</p>
               {evidenceLabel && <p className="evidence-context" role="status">{t("selectedEvidence")} · <strong>{evidenceLabel}</strong></p>}
-              <div className={`video-layout ${ref ? "has-reference" : ""}`}>
-                <div className="video-main"><div className="viewer-top"><strong>{chosen.label}</strong><span>{t("currentShot")}</span></div><div className="viewer" style={{ aspectRatio: `${ownCrop[2] - ownCrop[0]}/${ownCrop[3] - ownCrop[1]}`, maxWidth: `${440 * (ownCrop[2] - ownCrop[0]) / (ownCrop[3] - ownCrop[1])}px`, marginInline: "auto" }}>
+              <div className={`video-layout ${ref ? "has-reference" : ""} ${showPose && poseMode !== "none" ? "with-target" : ""} with-pose-guide`}>
+                <div className="video-main"><div className="viewer-top"><strong>{chosen.label}</strong><span>{t("currentShot")}</span></div>{showPose && poseMode !== "none" && <PoseLegend lang={lang} mode={poseMode} />}<div className="viewer" style={{ aspectRatio: `${ownCrop[2] - ownCrop[0]}/${ownCrop[3] - ownCrop[1]}`, maxWidth: `${440 * (ownCrop[2] - ownCrop[0]) / (ownCrop[3] - ownCrop[1])}px`, marginInline: "auto" }}>
                   <video style={cropStyle(chosen, ownCrop)} ref={video} src={chosen.preview_url} className={!playing ? "hidden-video" : ""} playsInline preload="metadata" onLoadedMetadata={(e) => { e.currentTarget.playbackRate = Number(speed); }} onEnded={() => setPlaying(false)} onTimeUpdate={(e) => { if (playing) setIndex(nearest(chosen, e.currentTarget.currentTime * 1e6)); }} />
                   {!playing && <img style={cropStyle(chosen, ownCrop)} src={`/api/assets/${chosen.id}/frames/${index}`} alt={`${chosen.label}, ${t("frame")} ${index}`} />}
-                  <div className="overlay-space" style={cropStyle(chosen, ownCrop)}><Pose frame={tracks[index]} show={showPose} /></div>
-                </div><div className="source-caption"><span>{t("source")} {((chosen.frame_index[index]?.source_time_us || 0) / 1e6).toFixed(3)}s</span><span>{t("frame")} {chosen.frame_index[index]?.source_frame_index ?? index}</span></div></div>
-                {ref ? <div className="video-reference"><div className="viewer-top"><strong>{ref.label}</strong><span>{relative >= 0 ? "+" : ""}{(relative / 1e6).toFixed(2)}s</span></div><div className="viewer" style={{ aspectRatio: `${refCrop[2] - refCrop[0]}/${refCrop[3] - refCrop[1]}`, maxWidth: `${440 * (refCrop[2] - refCrop[0]) / (refCrop[3] - refCrop[1])}px`, marginInline: "auto" }}><img style={cropStyle(ref, refCrop)} src={`/api/assets/${ref.id}/frames/${refIndex}`} alt={`${ref.label}, ${t("frame")} ${refIndex}`} /><div className="overlay-space" style={cropStyle(ref, refCrop)}><Pose frame={refTracks[refIndex]} show={showPose} /></div></div><div className="source-caption"><span>{t("source")} {((ref.frame_index[refIndex]?.source_time_us || 0) / 1e6).toFixed(3)}s</span><span>{t("frame")} {ref.frame_index[refIndex]?.source_frame_index ?? refIndex}</span></div><p className="alignment-note">{t(ownAnchor !== null && refAnchor !== null ? "matchingRelease" : "approximateAlignment")}</p></div> : <div className="video-guide"><span className="eyebrow">{t("details")}</span><h3>{t("evidence")}</h3><p>{t("evidenceNote")}</p>{chosen.phases.release && <button onClick={() => seek(chosen.phases.release!.frame_range[0])}>{t("releaseJump")} ↗</button>}</div>}
+                  <div className="overlay-space" style={cropStyle(chosen, ownCrop)}><Pose frame={tracks[index]} show={showPose} target={comparisonFrame} /></div>
+                </div><div className="source-caption"><span>{t("source")} {((chosen.frame_index[index]?.source_time_us || 0) / 1e6).toFixed(3)}s</span><span>{t("frame")} {chosen.frame_index[index]?.source_frame_index ?? index}</span></div><div className="transport"><button aria-label={t(playing ? "pause" : "play")} onClick={() => { if (playing) { video.current?.pause(); setPlaying(false); } else { if (video.current && video.current.ended) video.current.currentTime = 0; setPlaying(true); void video.current?.play().catch(() => setPlaying(false)); } }}>{playing ? "Ⅱ" : "▶"}<span>{t(playing ? "pause" : "play")}</span></button><input aria-label={t("timeline")} type="range" min="0" max={Math.max(0, chosen.frame_index.length - 1)} value={index} onChange={(e) => seek(Number(e.target.value))} /><span className="clip-time">{((chosen.frame_index[index]?.time_us || 0) / 1e6).toFixed(2)} / {(chosen.duration_us / 1e6).toFixed(1)}s</span><span className="playback-speed" aria-label={`${t("slow")} ${speed}×`}>{speed}×</span></div></div>
+                {ref ? <div className="video-reference"><div className="viewer-top"><strong>{ref.label}</strong><span>{relative >= 0 ? "+" : ""}{(relative / 1e6).toFixed(2)}s</span></div><div className="viewer" style={{ aspectRatio: `${refCrop[2] - refCrop[0]}/${refCrop[3] - refCrop[1]}`, maxWidth: `${440 * (refCrop[2] - refCrop[0]) / (refCrop[3] - refCrop[1])}px`, marginInline: "auto" }}><img style={cropStyle(ref, refCrop)} src={`/api/assets/${ref.id}/frames/${refIndex}`} alt={`${ref.label}, ${t("frame")} ${refIndex}`} /><div className="overlay-space" style={cropStyle(ref, refCrop)}><Pose frame={refTracks[refIndex]} show={showPose} /></div></div><div className="source-caption"><span>{t("source")} {((ref.frame_index[refIndex]?.source_time_us || 0) / 1e6).toFixed(3)}s</span><span>{t("frame")} {ref.frame_index[refIndex]?.source_frame_index ?? refIndex}</span></div><p className="alignment-note">{t(ownAnchor !== null && refAnchor !== null ? "matchingRelease" : "approximateAlignment")}</p></div> : null}
+                <PoseComparisonGuide comparison={poseComparison} frame={comparisonFrame} lang={lang} enabled={showPose} mode={poseMode} loading={poseLoading} failed={poseFailed} releaseFrame={releaseJumpFrame} followThroughFrame={followThroughJumpFrame} onSeek={seek} onSettings={openPoseSettings} />
               </div>
-              <div className="transport"><button aria-label={t(playing ? "pause" : "play")} onClick={() => { if (playing) { video.current?.pause(); setPlaying(false); } else { if (video.current && video.current.ended) video.current.currentTime = 0; setPlaying(true); void video.current?.play().catch(() => setPlaying(false)); } }}>{playing ? "Ⅱ" : "▶"}<span>{t(playing ? "pause" : "play")}</span></button><input aria-label={t("timeline")} type="range" min="0" max={Math.max(0, chosen.frame_index.length - 1)} value={index} onChange={(e) => seek(Number(e.target.value))} /><span className="clip-time">{((chosen.frame_index[index]?.time_us || 0) / 1e6).toFixed(2)} / {(chosen.duration_us / 1e6).toFixed(1)}s</span><span className="playback-speed" aria-label={`${t("slow")} ${speed}×`}>{speed}×</span></div>
 
               <details className="disclosure frame-tools"><summary>{t("reviewTools")}</summary><div className="disclosure-body"><div className="step-buttons"><button onClick={() => seek(index - 1)} disabled={index === 0}>← {t("prev")}</button><button onClick={() => seek(index + 1)} disabled={index >= chosen.frame_index.length - 1}>{t("next")} →</button><span>{t("frame")} {index}</span></div><h3>{t("release")}</h3>{chosen.phases.release ? <p className="interval">{chosen.phases.release.range_us.map((v) => (v / 1e6).toFixed(3)).join(" – ")}s <span className="pill">{t(["manual", "user_corrected"].includes(chosen.phases.release.source) ? "reviewedInterval" : "candidate")}</span></p> : <p className="muted">{ready ? t("notKnown") : t("noMetrics")}</p>}{ready && <><p className="muted">{t("phaseHelp")}</p><div className="phase-actions"><button className={last !== null ? "chosen" : ""} onClick={() => { setLast(index); seek(index); }}>{t("last")}{last !== null ? ` · ${last}` : ""}</button><button className={first !== null ? "chosen" : ""} onClick={() => { setFirst(index); seek(index); }}>{t("first")}{first !== null ? ` · ${first}` : ""}</button><button className="primary" disabled={!validSave || generating} onClick={() => void action(save)}>{t("save")}</button>{(last !== null || first !== null) && <button onClick={() => { setLast(null); setFirst(null); }}>{t("reset")}</button>}</div></>}</div></details>
               <details className="disclosure comparison-disclosure"><summary>{t("comparisonResults")}<span>{ref?.label || t("noReference")}</span></summary><div className="disclosure-body"><p className="muted">{reference ? t("comparisonNote") : t("noReferenceHelp")}</p>{reference && <button className="primary" disabled={!ready || generating || !!(ref && !ref.measurements)} onClick={() => void action(updateReport)}>{t("compare")}</button>}{ref && !ref.measurements && <p className="notice">{t("reference_unanalyzed")}</p>}{!reportMatches && report && <p className="notice" data-testid="comparison-stale">{t("comparisonDraft")}</p>}{reportMatches && reference && <div className="comparison-result"><h3>{t("comparisonLabel")} · {ref?.label}</h3>{report.comparison.differences.length ? <dl>{report.comparison.differences.map((d) => <div key={d.key}><dt>{t(d.key)}</dt><dd>{d.difference >= 0 ? "+" : ""}{d.difference.toFixed(d.unit === "milliseconds" ? 0 : 2)} {t(d.unit)}</dd></div>)}</dl> : <p className="muted">{t(report.comparison.reason)}</p>}</div>}</div></details>
             </section>
             <section className="secondary-details" aria-label={t("details")}>
               {ready && <details className="disclosure"><summary>{t("raw")}</summary><div className="disclosure-body"><p className="muted">{t("rawHelp")} {t("visibility")} {chosen.measurements!.visible_frames}/{chosen.measurements!.total_frames}</p><div className="raw-metrics">{chosen.measurements!.measurements.map((m) => <div key={m.key}><span>{t(m.key)}</span><strong>{m.value === null ? "—" : m.value.toFixed(m.unit === "milliseconds" ? 0 : 2)} <small>{t(m.unit)}</small></strong>{m.reason && <p>{t(m.reason)}</p>}{evidenceButton(m.evidence_frame_ids, t(m.key))}</div>)}</div><Curve asset={chosen} current={index} onSeek={seek} t={t} />{chosen.measurements!.flags.length > 0 && <ul className="limits-list">{chosen.measurements!.flags.map((f) => <li key={f}>{t(f)}</li>)}</ul>}{chosen.model_assist && <div className="model-observations"><h3>{t("modelReview")} · {t(chosen.analysis_config?.mode || "unknown")}</h3>{chosen.model_assist.observations.map((o, i) => <div key={i}><p>{t(o.attribute === "visibility" ? "model_visibility" : o.attribute)} · {t(o.interpretation)}</p>{evidenceButton(o.evidence_frame_ids, t(o.attribute))}</div>)}</div>}</div></details>}
-              <details className="disclosure"><summary>{t("sourceDetail")}</summary><div className="disclosure-body"><p className="muted">{t("limits")}</p>{coaching?.limitations.length ? <ul className="limits-list">{coaching.limitations.map((l, i) => <li key={i}>{cText(l)}</li>)}</ul> : null}<div className="sources">{report?.sources.map((s) => <a key={s.id} href={s.url} target="_blank" rel="noreferrer">{s.title || s.id} ↗</a>)}</div></div></details>
+              <details className="disclosure"><summary>{t("sourceDetail")}</summary><div className="disclosure-body"><p className="muted">{t("limits")}</p>{coaching?.coverage?.dimensions?.length ? <div className="review-coverage"><h3>{t("reviewCoverage")}</h3><ul>{coaching.coverage.dimensions.map((item) => <li key={item.rubric_id}><strong>{t(item.rubric_id)}</strong><span>{t(item.status)}</span><p>{cText(item.detail)}</p>{evidenceButton(item.evidence_frame_ids, t(item.rubric_id))}</li>)}</ul></div> : null}{coaching?.limitations.length ? <ul className="limits-list">{coaching.limitations.map((l, i) => <li key={i}>{cText(l)}</li>)}</ul> : null}<div className="sources">{report?.sources.map((s) => <a key={s.id} href={s.url} target="_blank" rel="noreferrer">{s.title || s.id} ↗</a>)}</div></div></details>
               <details className="disclosure downloads"><summary>{t("downloads")}</summary><div className="disclosure-body">{exportMatches ? <><p className="muted">{chosen.label} · {t("revision")} {chosen.revision} · {t("exportsLanguage")}: {report.locale === "zh" ? "中文" : "English"}{ref ? ` · ${t("referenceUsed")}: ${ref.label}` : ""}</p><div className="exports">{["text", "image", "video", "json"].map((kind) => <a key={kind} href={`/api/reports/${report.id}/${kind}`} download>{t(kind)} <span aria-hidden="true">↓</span></a>)}</div></> : <><p className="muted">{t("exportPending")}</p><button disabled={!ready || generating || !!(ref && !ref.measurements)} onClick={() => void action(updateReport)}>{t("refreshExports")}</button></>}</div></details>
             </section>
           </> : <div className="empty"><span className="mark" aria-hidden="true">↗</span><h1>{t("noShots")}</h1><p>{t("emptyHelp")}</p><button className="primary" onClick={openSettings}>{t("settingsEmpty")} ↗</button></div>}
@@ -997,6 +1062,7 @@ export default function App() {
           <section className="setting-section" id="settings-analysis" aria-labelledby="settings-analysis-title"><div className="setting-section-heading"><span>01</span><h3 id="settings-analysis-title">{t("analysisSection")}</h3></div><p className="settings-help">{t("nextAnalysis")}</p>
             {methodSelect}<p className="settings-method-hint">{t(mode === "local" ? "methodHint" : mode === "astra_codex" ? "codexHint" : "apiHint")}</p>
             {!modeReady && <p className="notice">{t(modeProblem)}</p>}
+            {unknownRetryAvailable && <label className="check retry-unknown"><input type="checkbox" checked={allowUnknownRetry} onChange={(e) => setAllowUnknownRetry(e.target.checked)} />{t("retryUnknown")}</label>}
             <details className="provider-help"><summary>{t("providers")}</summary><ul><li>Gemini · {t(health?.gemini_configured ? "providerReady" : "noKey")}</li><li>Astra / Codex · {t(health?.codex?.ready ? "providerReady" : health?.codex?.reason || "codex_not_installed")}</li><li>Astra / API · {t(health?.astra_api_configured ? "providerReady" : "openai_key_missing")}</li></ul></details>
             <div className="settings-fields"><label>{t("hand")}<select value={hand} onChange={(e) => setHand(e.target.value)}>{["auto", "right", "left"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label><label>{t("view")}<select value={view} onChange={(e) => setView(e.target.value)}>{["oblique", "side", "front", "unknown"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label><label className="full-width">{t("shot")}<select value={shot} onChange={(e) => setShot(e.target.value)}>{["stationary_jump_shot", "set_shot", "unknown"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label></div>
             {health?.models_ready === false && <p className="notice">{t("missingModels")}</p>}
@@ -1021,6 +1087,7 @@ export default function App() {
             </div>
           </section>
           <section className="setting-section" id="settings-comparison" aria-labelledby="settings-comparison-title"><div className="setting-section-heading"><span>03</span><h3 id="settings-comparison-title">{t("comparisonSection")}</h3></div>
+            <label>{t("poseTarget")}<select value={poseMode} onChange={(e) => setPoseMode(e.target.value as ComparisonMode)}><option value="none">{t("poseNone")}</option><option value="teaching">{t("poseTeaching")}</option><option value="reference">{t("poseReference")}</option></select></label><p className="settings-help comparison-help">{t("poseTargetHelp")}</p>
             {chosen ? <><p className="settings-help">{t("comparisonScope")} · <strong>{chosen.label}</strong></p><label>{t("comparator")}<select value={reference} onChange={(e) => { setReference(e.target.value); setSameView(false); }}><option value="">{t("noReference")}</option>{assets.filter((a) => a.id !== selected).map((a) => <option key={a.id} value={a.id}>{a.label}{!a.measurements ? ` · ${t("ready")}` : ""}</option>)}</select></label><p className="settings-help comparison-help">{t(assets.length < 2 ? "referenceMissing" : "comparisonNote")}</p>{reference && <label className="check"><input type="checkbox" checked={sameView} onChange={(e) => setSameView(e.target.checked)} />{t("sameView")}</label>}{ref && !ref.measurements && <p className="notice">{t("reference_unanalyzed")}</p>}{!reportMatches && report && <p className="notice">{t("comparisonDraft")}</p>}<button disabled={!ready || generating || !!(ref && !ref.measurements)} onClick={() => void action(updateReport).then((success) => { if (success) closeSettings(); })}>{t("compare")}</button></> : <p className="settings-empty-state">{t("comparisonEmpty")}</p>}
           </section>
           <section className="setting-section" id="settings-playback" aria-labelledby="settings-playback-title"><div className="setting-section-heading"><span>04</span><h3 id="settings-playback-title">{t("playbackSection")}</h3></div><p className="settings-help">{t("playbackHelp")}</p>

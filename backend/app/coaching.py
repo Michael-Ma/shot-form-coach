@@ -28,11 +28,14 @@ class ModelStrength(BaseModel):
     evidence_frame_ids: list[str] = Field(min_length=1, max_length=30)
 
 
+RubricId = Literal[
+    "coordinated_rise", "balanced_landing", "comfortable_release", "quiet_guide_hand", "relaxed_finish"
+]
+
+
 class ModelIssue(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    rubric_id: Literal[
-        "coordinated_rise", "balanced_landing", "comfortable_release", "quiet_guide_hand", "relaxed_finish"
-    ]
+    rubric_id: RubricId
     severity: Literal["high", "medium", "low"]
     confidence: Literal["high", "medium", "low"]
     title: Bilingual
@@ -45,11 +48,22 @@ class ModelIssue(BaseModel):
     source_ids: list[str] = Field(min_length=1, max_length=5)
 
 
+class ModelCoverage(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    rubric_id: RubricId
+    status: Literal["aligned", "needs_review", "not_visible", "uncertain"]
+    detail: Bilingual
+    evidence_frame_ids: list[str] = Field(max_length=30)
+
+
 class ModelCoaching(BaseModel):
     model_config = ConfigDict(extra="forbid")
     overall_summary: Bilingual
     strengths: list[ModelStrength] = Field(max_length=3)
     issues: list[ModelIssue] = Field(max_length=3)
+    # Older cached reviews lack coverage; accepting them must not imply that all
+    # dimensions were assessed or that unseen hands were judged to be correct.
+    coverage: list[ModelCoverage] = Field(default_factory=list, max_length=5)
 
 
 def bi(en, zh):
@@ -82,6 +96,7 @@ def validate_model_coaching(coaching, frame_ids):
         for item in result["issues"]
         for field in ("title", "observation", "standard_gap", "why_it_matters")
     )
+    assertions.extend(item["detail"] for item in result["coverage"])
     # Models may propose repetition counts in actions/drills, but measurement
     # numbers belong to the program's cards and cannot be silently invented here.
     frame_numbers = {
@@ -127,6 +142,22 @@ def validate_model_coaching(coaching, frame_ids):
         )
         if issue["confidence"] == "high":
             issue["confidence"] = "medium"
+    covered = set()
+    for item in result["coverage"]:
+        if item["rubric_id"] in covered:
+            raise ValueError("duplicate coaching coverage dimension")
+        covered.add(item["rubric_id"])
+        evidence = set(item["evidence_frame_ids"])
+        if not evidence <= supplied:
+            raise ValueError("invalid coverage frame evidence")
+        if item["status"] in ("aligned", "needs_review"):
+            if not evidence:
+                raise ValueError("assessed coverage requires frame evidence")
+            if (
+                item["rubric_id"] in ("coordinated_rise", "balanced_landing", "relaxed_finish")
+                and len(evidence) < 2
+            ):
+                raise ValueError("temporal coverage requires multiple distinct frames")
     return result
 
 
@@ -157,16 +188,27 @@ def _finite_measurements(asset):
     return result
 
 
-def _human_metrics(asset):
-    values = _finite_measurements(asset)
+def _measurement_limits(asset):
     measures = asset.get("measurements") or {}
     release = (asset.get("phases") or {}).get("release")
-    flags = set(measures.get("flags", []))
-    wide = bool(release and release["range_us"][1] - release["range_us"][0] > 150000)
-    phase_uncertain = "release_unknown" in flags or not release or wide
+    phase_uncertain = (
+        "release_unknown" in measures.get("flags", [])
+        or not release
+        or release["range_us"][1] - release["range_us"][0] > 150000
+    )
     side_uncertain = measures.get("side_source") == "ambiguous_estimate"
-    if phase_uncertain or side_uncertain:
+    return bool(phase_uncertain), side_uncertain
+
+
+def _human_metrics(asset):
+    values = _finite_measurements(asset)
+    phase_uncertain, side_uncertain = _measurement_limits(asset)
+    if phase_uncertain:
         values = {}
+    elif side_uncertain:
+        # Hip timing does not depend on which arm shoots. Uncertain arm tracking
+        # must not remove an independently identified, narrow release interval.
+        values = {key: value for key, value in values.items() if key == "loading_to_release"}
     metrics = []
     rhythm = values.get("loading_to_release")
     if rhythm:
@@ -385,6 +427,55 @@ def _next_practice(issues, limited=False):
     }
 
 
+def _empty_state(outcome):
+    states = {
+        "issues_found": (
+            bi("Start with the first practice priority", "先从第一个练习重点开始"),
+            bi(
+                "Review the cited moment and try one change in the next set.",
+                "回看对应画面，下一组只尝试一个调整。",
+            ),
+        ),
+        "no_priority_issue": (
+            bi("No major visible fault identified", "这球未发现明显的优先问题"),
+            bi(
+                "The visual review found supported strengths without a clear correction to prioritize in this attempt. This does not establish perfect form or rule out details that were not visible.",
+                "视觉评价记录了有画面支持的优点，这一球中没有发现需要优先纠正的明确问题。这不代表动作完美，也不代表看不清的细节已经达标。",
+            ),
+        ),
+        "limited_visibility": (
+            bi("Some details still need a clearer view", "部分动作还需要看清"),
+            bi(
+                "The available evidence is insufficient for the remaining judgments. Keep the supported observations and check the listed visibility or timing limits before choosing a correction.",
+                "剩余判断缺少足够证据。先保留已有依据的动作观察，再查看哪些细节受视角、出手侧或离手时刻影响，不把看不清当作技术错误。",
+            ),
+        ),
+        "model_failed": (
+            bi("Visual review did not complete", "本次视觉评价未完成"),
+            bi(
+                "The selected model call or response validation failed. Available local motion measurements are retained; this is a processing failure, not a judgment of your shooting or video quality.",
+                "所选模型调用或结果校验失败，已有本地动作数据仍然保留。这是处理失败，不是对投篮水平或视频清晰度的判断。",
+            ),
+        ),
+        "measurements_only": (
+            bi("Motion measurements are ready", "动作数据已就绪"),
+            bi(
+                "This review currently contains local motion measurements. Choose a visual model and analyze the shot for an evidence-linked assessment of coordination, landing and hand action.",
+                "当前结果主要来自本地动作测量。选择视觉模型并分析这一球，可进一步评价起身衔接、落地和手部动作，并回看对应证据。",
+            ),
+        ),
+        "awaiting_analysis": (
+            bi("Analyze this shot to start your review", "先分析这一球"),
+            bi(
+                "Run an analysis to see the visible movement, available measurements and supported practice priorities.",
+                "分析后即可查看动作观察、可用数据和有证据支持的练习重点。",
+            ),
+        ),
+    }
+    title, detail = states[outcome]
+    return {"title": title, "detail": detail}
+
+
 def build_review(asset, comparison=None):
     rubric = load_rubric()
     has_analysis = bool(asset.get("measurements"))
@@ -398,21 +489,37 @@ def build_review(asset, comparison=None):
     ]
     model = asset.get("model_assist") or {}
     coaching = None
-    if model.get("coaching") and model.get("asset_revision") == asset.get("revision") and not phase_limited:
+    model_failed = bool(asset.get("model_error"))
+    model_stale = bool(model.get("coaching") and model.get("asset_revision") != asset.get("revision"))
+    if model.get("coaching") and not model_stale:
         try:
             coaching = validate_model_coaching(
                 model["coaching"], [f["frame_id"] for f in asset.get("frame_index", [])]
             )
         except (ValueError, TypeError):
+            model_failed = True
             limitations.append(
                 bi(
                     "The visual review could not be linked to valid evidence, so it was not used.",
                     "视觉评价未能关联到有效证据，因此未纳入本次结论。",
                 )
             )
+    phase_uncertain, side_uncertain = _measurement_limits(asset)
+    withheld_dimensions = []
     if coaching:
-        strengths = coaching["strengths"][:2]
+        strengths = coaching["strengths"][:3]
         for item in coaching["issues"]:
+            # Landing and whole-body sequence observations do not depend on the
+            # local tracker's arm choice or exact release anchor. Keep them and
+            # cited visual strengths, while withholding judgments whose rubric
+            # explicitly needs hand identity or clear separation.
+            if (phase_uncertain or side_uncertain) and item["rubric_id"] in (
+                "comfortable_release",
+                "quiet_guide_hand",
+                "relaxed_finish",
+            ):
+                withheld_dimensions.append(item["rubric_id"])
+                continue
             issues.append({**item, "id": "visual_" + item["rubric_id"], "rank": 0, "basis": "model"})
         limitations.append(
             bi(
@@ -446,6 +553,24 @@ def build_review(asset, comparison=None):
         )
     available = [m for m in metrics if m["status"] == "measured"]
     limited = phase_limited or len(available) < 2
+    if model_failed and not coaching:
+        outcome = "model_failed"
+    elif not has_analysis and not coaching:
+        outcome = "awaiting_analysis"
+    elif issues:
+        outcome = "issues_found"
+    elif (
+        coaching
+        and not withheld_dimensions
+        and (coaching["strengths"] or any(item["status"] == "aligned" for item in coaching["coverage"]))
+        and not any(item["status"] == "needs_review" for item in coaching["coverage"])
+    ):
+        outcome = "no_priority_issue"
+    elif coaching or limited:
+        outcome = "limited_visibility"
+    else:
+        outcome = "measurements_only"
+    empty_state = _empty_state(outcome)
     descriptions_en, descriptions_zh = [], []
     by_id = {m["id"]: m for m in available}
     for key, intro_en, intro_zh in [
@@ -456,7 +581,7 @@ def build_review(asset, comparison=None):
         if key in by_id:
             descriptions_en.append(intro_en + by_id[key]["display_value"]["en"].lower() + ".")
             descriptions_zh.append(intro_zh + by_id[key]["display_value"]["zh"] + "。")
-    if coaching and (coaching["issues"] or coaching["strengths"]):
+    if coaching and (coaching["issues"] or coaching["strengths"] or coaching["coverage"]):
         summary = coaching["overall_summary"]
     elif available:
         tail = (
@@ -478,14 +603,18 @@ def build_review(asset, comparison=None):
             "This clip does not yet provide enough clear evidence for a useful form judgment. Confirm the shooting hand and release moment, then review again.",
             "这段片段目前还缺少足够清晰的证据，暂时不能给出可靠的动作判断。先确认出手手和离手时刻，再复盘。",
         )
-    if not has_analysis:
+    if outcome == "awaiting_analysis":
         headline = bi("Your shooting review starts here", "从这一球开始复盘")
         summary = bi(
             "Analyze this shot to see its rhythm, release hand position and finish, followed by the most useful practice priorities.",
             "分析这一球后，先看出手节奏、手位和收势，再看最值得练习的重点。",
         )
+    elif outcome == "model_failed":
+        headline = empty_state["title"]
     elif issues:
         headline = issues[0]["title"]
+    elif outcome == "no_priority_issue":
+        headline = empty_state["title"]
     elif limited:
         headline = bi("A clearer release will make this review more useful", "看清离手，评价才能更具体")
     else:
@@ -497,13 +626,29 @@ def build_review(asset, comparison=None):
                 "本地识别主要描述时长与手臂运动；辅助手、全身协调和身体平衡还需要更清楚的视觉复核，才能形成具体建议。",
             )
         )
-    if phase_limited and has_analysis:
+    if side_uncertain and has_analysis:
         limitations.append(
             bi(
-                "The release interval or shooting side is uncertain, so release-dependent judgments are withheld.",
-                "离手区间或出手侧仍不确定，依赖这些信息的数值和动作判断暂不展示。",
+                "The local tracker could not identify the shooting hand confidently. Arm-specific measurements and hand-dependent findings are withheld; cited visual observations of the movement remain available.",
+                "本地识别尚不能确定出手侧，因此暂不展示依赖左右手的数值和问题判断；已有画面证据支持的整体动作观察仍然保留。",
             )
         )
+    if phase_uncertain and has_analysis:
+        limitations.append(
+            bi(
+                "The release interval is missing or too wide. Exact release metrics and separation-dependent findings are withheld; visual observations of the overall movement remain available.",
+                "离手区间缺失或过宽，因此暂不展示精确出手指标和依赖离球瞬间的问题判断；整体动作的视觉观察仍然保留。",
+            )
+        )
+    if model_stale:
+        limitations.append(
+            bi(
+                "The saved visual review belongs to an earlier shot revision. It is not applied to the current timing or settings.",
+                "已有视觉评价对应较早版本，尚未应用到当前时刻校准或设置。",
+            )
+        )
+    if model_failed:
+        limitations.append(_empty_state("model_failed")["detail"])
     if comparison and comparison.get("status") == "conditional_projection_comparison":
         limitations.append(
             bi(
@@ -519,14 +664,34 @@ def build_review(asset, comparison=None):
             )
         )
     return {
-        "version": "human-review-v1",
+        "version": "human-review-v2",
         "assessment_source": "model" if coaching else "measurements",
-        "status": "awaiting_analysis" if not has_analysis else "limited" if limited else "reviewed",
+        "status": "awaiting_analysis"
+        if outcome == "awaiting_analysis"
+        else "limited"
+        if limited
+        else "reviewed",
+        "outcome": outcome,
+        "empty_state": empty_state,
+        "coverage": {
+            "model_review": "accepted"
+            if coaching
+            else "failed"
+            if model_failed
+            else "stale"
+            if model_stale
+            else "not_run",
+            "available_metrics": len(available),
+            "total_metrics": len(metrics),
+            "withheld_dimensions": withheld_dimensions,
+            "dimension_coverage": "reported" if coaching and coaching["coverage"] else "unspecified",
+            "dimensions": coaching["coverage"] if coaching else [],
+        },
         "overall": {"headline": headline, "summary": summary},
         "metrics": metrics,
         "strengths": strengths,
         "issues": issues,
-        "next_practice": _next_practice(issues, limited),
+        "next_practice": _next_practice(issues, outcome == "limited_visibility"),
         "limitations": limitations,
         "rubric_version": rubric["version"],
     }

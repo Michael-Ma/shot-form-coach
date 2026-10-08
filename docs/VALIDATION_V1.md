@@ -139,3 +139,29 @@ and read-only context; configuration selectors appear only in the drawer.
 no horizontal overflow, Escape/backdrop closing, focus return and first/last Tab wrapping.
 Changing settings generated no non-GET requests. Mocked tests cover Workbench states and
 upload-error recovery; no real clip was uploaded or sent to a model for this UI follow-up.
+
+## Review outcomes and pose comparison (V0.5)
+
+The current local records explain the reported empty issue panels: Shots2–6 have accepted
+Astra reviews describing visible strengths with no major correction, while Shot2's valid
+review was previously suppressed by a local handedness flag. Shot1's latest Gemini request
+has no successful review. These cases now have distinct states; cached valid strengths and
+summaries are retained with dimension-specific limits.
+
+A synthetic text-only request reproduced a Gemini HTTP400 for the old response_schema
+serialization (unsupported additional_properties fields). The same schema sent through
+response_json_schema succeeded (21 input tokens,29 output tokens), without any personal
+video or image. New receipts capture HTTP rejection codes separately from unknown outcomes.
+No historical unknown charge is rewritten as zero, and private analysis is not retried silently.
+
+83 backend tests and19 frontend tests pass, plus Ruff and the production build. New tests cover
+review outcomes, partial uncertainty, optional rubric coverage, pose adaptation/provenance,
+phase and scale registration, visibility/view gates, frame-range clipping, known HTTP rejection,
+and explicit unknown-request retry authorization before queue creation.
+
+Real Chrome checks on1440px desktop and390px mobile inspected teaching and personal overlays,
+phase jumps, readable differences, Shot2's preserved review with a separate overlay limitation,
+and the failure state. Teaching mode draws only the demonstrated shooting arm; personal mode
+uses the selected real shot. Screenshots were captured and viewed. No model POST/retry was
+made during this UI check. Newly drawn reference geometry is a visual teaching aid and is not
+validated motion-capture ground truth or a technical-fault threshold.
