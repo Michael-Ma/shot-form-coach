@@ -12,3 +12,8 @@ dist/
 .DS_Store
 .render-cache/
 *.log
+*.egg-info/
+*.tsbuildinfo
+
+.playwright-cli/
+vendor-notes/

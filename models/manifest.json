@@ -1,0 +1,16 @@
+{
+  "pose": {
+    "filename": "pose_landmarker_full.task",
+    "url": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task",
+    "version": "full-float16-1",
+    "source": "https://developers.google.com/edge/mediapipe/solutions/vision/pose_landmarker",
+    "sha256": "5134a3aad27a58b93da0088d431f366da362b44e3ccfbe3462b3827a839011b1"
+  },
+  "ball": {
+    "filename": "yolox_s.onnx",
+    "url": "https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/object_detection_yolox/object_detection_yolox_2022nov.onnx",
+    "version": "opencv-yolox-s-2022nov",
+    "source": "https://github.com/opencv/opencv_zoo/tree/main/models/object_detection_yolox",
+    "sha256": "c5c2d13e59ae883e6af3b45daea64af4833a4951c92d116ec270d9ddbe998063"
+  }
+}
