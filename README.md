@@ -13,7 +13,8 @@ change at a time.
 ## The proposed experience
 
 1. Import a shooting session or existing clips, retaining the original video timeline.
-2. Check visibility, camera view, shot context, and movement-phase coverage.
+2. Check visibility, camera view, shot context, and movement-phase coverage. Automatic phase
+   proposals can be corrected with one or two clicks; correction is optional.
 3. Review phase-aligned comparisons against a teaching reference or a personal comparator.
 4. Receive a small set of findings, each linked to video evidence and a specific practice cue.
 5. Record another matched session and check whether the targeted behavior becomes more consistent.
@@ -43,6 +44,9 @@ The example demonstrates the output format and an observable difference.
 
 - [Product and system design](docs/DESIGN.zh-CN.md)
 - [Curry teaching and technical research](docs/RESEARCH.zh-CN.md)
+- [Coaching studies, MediaPipe, and model research](docs/RESEARCH_COACHING_AND_MODELS.zh-CN.md)
+- [Model evaluation plan](docs/MODEL_EVALUATION.zh-CN.md)
+- [Accepted optional phase-correction decision](docs/ADR-0002-optional-phase-correction.md)
 - [Reference motion versus an individual target](docs/ADR-0001-reference-target.md)
 - [Initial teaching rules](references/teaching-rules.json)
 - [Source catalog](references/sources.json)

@@ -55,3 +55,8 @@
 [NBA 的 Curry shooting-form 页面](https://www.nba.com/watch/video/artof3bblock)仍存在，但本次读取显示视频不可用，因此没有把它当作已观看的动作证据。
 
 要做“本人和库里本人同阶段并排”的正式输出，还需要取得可用于该分析与展示的参考片段，并标注阶段、视角、投篮距离与类型。当前仓库仅保存来源链接和原创示意；分析可用性与对外分发权限应分开记录。
+
+
+## 后续补充 2026 10 07
+
+[MediaPipe、模型比较和投篮纠正研究补充](RESEARCH_COACHING_AND_MODELS.zh-CN.md)记录新增论文的证据范围、拟加入的功能和限制。[模型评测方案](MODEL_EVALUATION.zh-CN.md)记录候选与验证方法。用户已确认自动分析后可选修正关键阶段，见 [ADR 0002](ADR-0002-optional-phase-correction.md)。
