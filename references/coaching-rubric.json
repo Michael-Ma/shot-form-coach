@@ -1,0 +1,72 @@
+{
+  "version": "teaching-principles-2026-10-08-v1",
+  "status": "qualitative_teaching_rubric_not_validated_fault_classifier",
+  "standard_definition": {
+    "en": "Context-sensitive teaching goals for a comfortable, coordinated and controllable stationary practice shot. Natural individual form may differ. A single shot does not prove a habitual fault or repeatability.",
+    "zh": "以舒适、协调、可控制的定点练习投篮为教学目标；允许自然的个人动作差异。单次投篮不能证明习惯性错误或重复稳定性。"
+  },
+  "global_rules": [
+    "Issue observations must describe a specific visible event and cite supplied frame IDs. Missing visibility is a limitation, not a player fault.",
+    "Use at most three supported issues, ranked by review priority then evidence confidence. Do not invent a minimum number of issues or an overall technique score.",
+    "No universal ideal joint angles, mandatory release height, minimum hold duration, or celebrity-pose similarity score.",
+    "Do not infer make/miss, miss direction, force, ball spin or a cause of a miss from body pose.",
+    "A motion after release cannot change the ball already in flight. Finish advice is an optional practice cue.",
+    "Higher-priority model observations remain provisional. No high-severity diagnosis is accepted without a coach-confirmed workflow.",
+    "Do not describe one attempt as consistent, repeatable across shots, improved or a habit. Use observed single-attempt language.",
+    "Numbers displayed in measurements are program-computed. Do not invent or restate measurement numbers in model prose; practical drill counts are allowed.",
+    "A single selected personal reference is not a validated good shot and model coaching sees no reference video.",
+    "Suggested drill counts are product proposals for a short practice trial, not dosages validated by the cited teaching sources."
+  ],
+  "dimensions": [
+    {
+      "id": "coordinated_rise",
+      "label": {"en": "Connected rise and ball lift", "zh": "起身与举球衔接"},
+      "teaching_goal": {"en": "Let the lower-body rise and ball lift connect comfortably into the release, allowing individual one-motion or two-motion styles.", "zh": "让下肢起身、举球与出手舒适衔接，允许个人采用一段式或两段式动作。"},
+      "required_evidence": ["stationary practice context", "continuous visible hips or knees, ball and shooting arm from load to release", "specific visible interruption beyond a normal individual set point"],
+      "do_not_infer": ["A slow or long measured phase alone is not poor rhythm.", "A two-motion pause alone is not a fault.", "Wrist and hip timing does not establish force transfer."],
+      "source_ids": ["curry-mechanics", "curry-form-practice"],
+      "suggested_drill": {"en": "Try two sets of five comfortable close-range shots with one cue: let the rise and ball lift flow together. Compare the release sequence with the original clip.", "zh": "试做两组、每组 5 次舒适距离近投，只想一个提示：起身与举球自然衔接。再与原片比较出手前的动作顺序。"},
+      "practice_check": {"en": "Check whether the specific stop or restart is reduced without forcing a new rhythm. Judge across the set, not from one make.", "zh": "看原来可见的停顿或重启是否减少，同时保持舒适节奏。看整组表现，不靠一球投进就下结论。"}
+    },
+    {
+      "id": "balanced_landing",
+      "label": {"en": "Controlled balance and landing", "zh": "平衡与落地控制"},
+      "teaching_goal": {"en": "Finish the stationary practice shot with a comfortably controlled landing; a natural forward drift does not itself violate this goal.", "zh": "定点练习投篮后能够舒适、可控地落地；自然向前移动本身并不违背这个目标。"},
+      "required_evidence": ["stationary practice context", "feet and trunk continuously visible through landing", "camera motion accounted for", "visible loss of balance or corrective recovery, not ordinary drift"],
+      "do_not_infer": ["Do not demand takeoff and landing on precisely the same spot.", "One landing cannot establish consistency across shots.", "Camera-relative displacement is not validated body balance."],
+      "source_ids": ["curry-mechanics", "curry-practice-routine"],
+      "suggested_drill": {"en": "Try five comfortable close-range shots. After each, notice whether you can finish in control without an extra recovery step; allow your natural landing position.", "zh": "试做 5 次舒适距离近投，每次留意落地后能否自然站稳、无需额外找平衡；允许自然的落地点变化。"},
+      "practice_check": {"en": "Compare the visible recovery movement across the set from the same fixed camera. Do not grade ordinary forward sway as an error.", "zh": "用同一固定机位比较这组是否仍需额外找平衡，不把普通向前移动当作错误。"}
+    },
+    {
+      "id": "comfortable_release",
+      "label": {"en": "Comfortable release and extension", "zh": "舒适出手与伸展"},
+      "teaching_goal": {"en": "Complete a comfortable shooting-arm extension into release without imposing an exact elbow angle or a universal release height.", "zh": "让出手臂舒适地伸展并完成离手，不强求固定肘角或所有人相同的出手高度。"},
+      "required_evidence": ["narrow release interval", "clear shoulder, elbow, wrist and ball in several frames around separation", "specific visible interrupted extension or release pattern that needs contextual review"],
+      "do_not_infer": ["Wrist height is not ball release height.", "A low hand position alone is not an error.", "Projected elbow angle is not a validated 3-D angle.", "Never force elbow lockout."],
+      "source_ids": ["curry-mechanics", "curry-form-practice"],
+      "suggested_drill": {"en": "Try five close-range form shots, letting the shooting arm extend comfortably toward the target. Review the hand and ball together around release; do not force the elbow straight.", "zh": "试做 5 次近距离定型投篮，让出手臂舒适地向目标伸展，回看离手附近手与球的关系，不要强行锁死肘关节。"},
+      "practice_check": {"en": "See whether the specific interruption becomes less visible while the motion stays comfortable. Compare release frames at the same distance and angle.", "zh": "看之前具体可见的中断是否减少，动作是否仍然舒适；在同距离、同角度下比较离手附近画面。"}
+    },
+    {
+      "id": "quiet_guide_hand",
+      "label": {"en": "Support-hand release", "zh": "辅助手离球"},
+      "teaching_goal": {"en": "Use the guide hand to support the ball while the shooting hand completes the release. A visible push or twist is a review hypothesis, not proof of force or spin.", "zh": "辅助手负责支撑，让出手手完成离球。可见的推拨或转动只能作为复核线索，不能证明实际用力或球的旋转。"},
+      "required_evidence": ["both hands and ball individually discernible at separation", "close clear frames showing a specific guide-hand movement"],
+      "do_not_infer": ["Wide-angle pose landmarks alone cannot establish guide-hand interference.", "Do not infer ball spin, applied force or miss direction."],
+      "source_ids": ["jr-nba-shooting", "curry-form-practice"],
+      "suggested_drill": {"en": "At a comfortable close distance, try five one-hand form shots, then five with the guide hand lightly supporting the ball. Record a close view of both hands at release.", "zh": "在舒适近距离先试 5 次单手定型投篮，再试 5 次辅助手轻扶球的投篮，拍清两只手在离球时的动作。"},
+      "practice_check": {"en": "Compare the visible support-hand movement in the two sets. Keep the result a hypothesis until the hands are clearly visible.", "zh": "比较两组可见的辅助手动作，只有看清双手后再确认，先把判断当作待验证的线索。"}
+    },
+    {
+      "id": "relaxed_finish",
+      "label": {"en": "Relaxed shooting finish", "zh": "放松随挥与收势"},
+      "teaching_goal": {"en": "In comfortable close-range practice, finish the release and briefly retain a relaxed shooting-hand position so the motion is easy to review. There is no required hold time.", "zh": "在舒适的近投练习中完整完成离手，稍留放松的收势，方便回看动作；不规定必须保持几秒。"},
+      "required_evidence": ["narrow release interval", "continuous visible shooting arm after release", "a clearly observed early sustained withdrawal, not small projection noise"],
+      "do_not_infer": ["Post-release movement does not change the ball in flight.", "A lowering percentage or hold time is not a validated fault threshold.", "This is low-priority optional practice, never a high-severity diagnosis."],
+      "source_ids": ["curry-mechanics", "curry-form-practice", "jr-nba-shooting"],
+      "suggested_drill": {"en": "Try five comfortable near-basket shots. Complete the release, briefly leave a relaxed finish, and compare the motion around release with the original clip.", "zh": "试做 5 次舒适的近筐投篮，完整完成离手，轻松保留收势片刻；再与原片比较离手附近的动作。"},
+      "practice_check": {"en": "Check whether the finish is comfortable and easier to observe across the set. Do not use hold time or a single make as proof of better shooting.", "zh": "看这组收势是否舒适、是否更容易观察；不把保持时长或一次命中当作技术改善的证明。"}
+    }
+  ]
+}

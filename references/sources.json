@@ -6,7 +6,7 @@
     "checked_date": "2026-10-07",
     "use": "stance, coordinated motion, extension and form practice",
     "media_included": false,
-    "title": "Curry \u00b7 shooting mechanics"
+    "title": "Curry · shooting mechanics"
   },
   {
     "id": "curry-form-practice",
@@ -15,7 +15,7 @@
     "checked_date": "2026-10-07",
     "use": "close-range form practice and front/side video review",
     "media_included": false,
-    "title": "Curry \u00b7 form shooting practice"
+    "title": "Curry · form shooting practice"
   },
   {
     "id": "curry-practice-routine",
@@ -160,7 +160,7 @@
     "use": "25 university players; external-focus imagery vs technique instruction in free throws",
     "checked_date": "2026-10-07",
     "media_included": false,
-    "title": "Attention focus and imagery \u00b7 2021 study"
+    "title": "Attention focus and imagery · 2021 study"
   },
   {
     "id": "self-controlled-feedback-2012",
@@ -177,6 +177,15 @@
     "retrieval_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC10776772/fullTextXML",
     "use": "20 novice free-throw shooters; post-block benefit; no long-term retention evaluation",
     "checked_date": "2026-10-07",
+    "media_included": false
+  },
+  {
+    "id": "jr-nba-shooting",
+    "tier": "official_teaching_article",
+    "title": "Jr. NBA · shooting fundamentals",
+    "url": "https://jr.nba.com/shooting/",
+    "use": "guide-hand support, relaxed follow-through, close-range form practice",
+    "checked_date": "2026-10-08",
     "media_included": false
   }
 ]

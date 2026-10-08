@@ -29,6 +29,111 @@ def wrist_height(frame, side):
     return (shoulder["y"] - wrist["y"]) * frame["height"] / length
 
 
+def wrist_above_face(frame, side):
+    """Image-space wrist height relative to the nose, not a 3-D release height."""
+    wrist, face = joint(frame, side + "_wrist"), joint(frame, "nose")
+    length = torso_length(frame)
+    if not length or not visible(wrist) or not visible(face):
+        return None
+    return (face["y"] - wrist["y"]) * frame["height"] / length
+
+
+def aggregate_window(window, metric):
+    valid = [(f, metric(f)) for f in window]
+    valid = [(f, v) for f, v in valid if v is not None and math.isfinite(v)]
+    if len(valid) < 3 or len(valid) < 0.7 * len(window):
+        return None, []
+    return sum(v for _, v in valid) / len(valid), [f for f, _ in valid]
+
+
+def human_motion_measures(frames, phases, side, side_source):
+    """Additional descriptive metrics. Constants are measurement gates, not form standards."""
+    release = (phases or {}).get("release")
+    anchor = release_anchor(phases)
+    keys = [
+        ("release_wrist_height", "torso_lengths"),
+        ("release_wrist_above_face", "torso_lengths"),
+        ("release_elbow_angle", "degrees_projection"),
+        ("finish_above_shoulder_ms", "milliseconds"),
+    ]
+    reason = "release_unknown" if anchor is None else None
+    if side_source == "ambiguous_estimate":
+        reason = "handedness_uncertain"
+    if release and release["range_us"][1] - release["range_us"][0] > 150000:
+        reason = "release_interval_wide"
+    if reason:
+        return [measurement(key, None, unit, [], reason) for key, unit in keys]
+
+    near = frame_window(frames, release["range_us"][0] - 50000, release["range_us"][1] + 50000)
+    output = []
+    for key, unit, metric in [
+        ("release_wrist_height", "torso_lengths", lambda f: wrist_height(f, side)),
+        ("release_wrist_above_face", "torso_lengths", lambda f: wrist_above_face(f, side)),
+        ("release_elbow_angle", "degrees_projection", lambda f: angle(f, side)),
+    ]:
+        value, evidence = aggregate_window(near, metric)
+        output.append(measurement(key, value, unit, evidence, "track_gaps" if value is None else None))
+
+    # A missing frame or gap can hide when the hand falls. Do not count across it.
+    # Use the latest possible release for conservative "at least" durations.
+    finish_start = release["range_us"][1]
+    post = frame_window(frames, finish_start, finish_start + 1000000)
+    continuous, previous = [], finish_start
+    for frame in post:
+        height = wrist_height(frame, side)
+        if height is None or frame["time_us"] - previous > 120000:
+            break
+        continuous.append((frame, height))
+        previous = frame["time_us"]
+    enough = len(continuous) >= 5 and continuous[-1][0]["time_us"] - finish_start >= 300000
+    initial = continuous[:3]
+    raised = initial and len(initial) == 3 and all(h > 0.05 for _, h in initial)
+    if not enough or not raised:
+        output.append(
+            measurement(
+                "finish_above_shoulder_ms",
+                None,
+                "milliseconds",
+                [],
+                "track_gaps" if not enough else "raised_finish_not_observed",
+            )
+        )
+        return output
+    crossing, confirmed_at, lowered_run = None, None, []
+    for frame, height in continuous:
+        lowered_run = lowered_run + [frame] if height < -0.05 else []
+        if len(lowered_run) >= 3 and frame["time_us"] - lowered_run[0]["time_us"] >= 60000:
+            crossing, confirmed_at = lowered_run[0], frame
+            break
+    if crossing:
+        end = crossing
+        evidence = [f for f, _ in continuous if f["time_us"] <= confirmed_at["time_us"]]
+    else:
+        # Absence of a sustained lowering is not proof of being continuously
+        # above the shoulder. Stop the lower bound at the first ambiguous point.
+        prefix = []
+        for frame, height in continuous:
+            if height <= 0.05:
+                break
+            prefix.append(frame)
+        if not prefix or prefix[-1]["time_us"] - finish_start < 300000:
+            output.append(
+                measurement("finish_above_shoulder_ms", None, "milliseconds", [], "finish_position_uncertain")
+            )
+            return output
+        end, evidence = prefix[-1], prefix
+    held = measurement(
+        "finish_above_shoulder_ms", (end["time_us"] - finish_start) / 1000, "milliseconds", evidence
+    )
+    held.update(
+        lower_bound=crossing is None,
+        crossed_shoulder=crossing is not None,
+        observed_to_ms=(continuous[-1][0]["time_us"] - finish_start) / 1000,
+    )
+    output.append(held)
+    return output
+
+
 def choose_side(frames, requested="auto"):
     if requested != "auto":
         return requested, "user_setting"
@@ -168,9 +273,7 @@ def measure(track, phases, side, side_source):
         )
 
         def aggregate(window, metric):
-            values = [metric(f) for f in window]
-            good = [v for v in values if v is not None]
-            return sum(good) / len(good) if len(good) >= 3 and len(good) >= 0.7 * len(values) else None
+            return aggregate_window(window, metric)[0]
 
         e, late_height = (
             aggregate(early, lambda f: wrist_height(f, side)),
@@ -229,8 +332,9 @@ def measure(track, phases, side, side_source):
                 "loading_unknown" if duration is None else None,
             )
         )
+    measurements.extend(human_motion_measures(frames, phases, side, side_source))
     return {
-        "version": "projection-measures-v1",
+        "version": "projection-measures-v2",
         "side": side,
         "side_source": side_source,
         "measurements": measurements,
@@ -272,7 +376,13 @@ def compare(asset, own, reference=None, ref_measures=None, assume_same_view=Fals
     differences = []
     for metric in own["measurements"]:
         other = values.get(metric["key"])
-        if metric["value"] is not None and other and other["value"] is not None:
+        if (
+            metric["value"] is not None
+            and other
+            and other["value"] is not None
+            and not metric.get("lower_bound")
+            and not other.get("lower_bound")
+        ):
             differences.append(
                 {
                     "measurement_id": metric["id"],

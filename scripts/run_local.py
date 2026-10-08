@@ -50,6 +50,7 @@ def check():
 
 def available(port):
     with socket.socket() as listener:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             listener.bind(("127.0.0.1", port))
         except OSError:
@@ -67,7 +68,7 @@ def main():
     if args.check:
         return
     existing = health()
-    if existing and existing.get("app") == "shot-form-coach" and existing.get("version") == "0.3.0":
+    if existing and existing.get("app") == "shot-form-coach" and existing.get("version") == "0.4.0":
         try:
             with urllib.request.urlopen(UI_URL, timeout=2):
                 pass

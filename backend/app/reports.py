@@ -7,7 +7,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-from .analysis import compare, findings, release_anchor
+from .analysis import compare, release_anchor
+from .coaching import build_review
 from .config import ROOT
 from .copy import labels
 from .db import ident, now
@@ -155,6 +156,34 @@ def frame_image(settings, asset, track, relative, anchor, color, size=(640, 480)
     }
 
 
+def local_text(value, locale):
+    return value.get(locale, value.get("en", "")) if isinstance(value, dict) else str(value)
+
+
+def paragraph(draw, position, value, width, size=22, locale="en", color="#1d4338", lines=3):
+    words = list(value) if locale == "zh" else value.split(" ")
+    separator = "" if locale == "zh" else " "
+    rows, current = [], ""
+    face = font(size, locale)
+    for word in words:
+        trial = current + separator + word if current else word
+        if draw.textlength(trial, font=face) > width and current:
+            rows.append(current)
+            current = word
+        else:
+            current = trial
+    if current:
+        rows.append(current)
+    if len(rows) > lines:
+        rows = rows[:lines]
+        while rows[-1] and draw.textlength(rows[-1] + "…", font=face) > width:
+            rows[-1] = rows[-1][:-1]
+        rows[-1] += "…"
+    for index, row in enumerate(rows):
+        text(draw, (position[0], position[1] + index * (size + 8)), row, size, locale, color)
+    return len(rows) * (size + 8)
+
+
 def build_report(
     settings,
     asset,
@@ -170,10 +199,66 @@ def build_report(
     comparison = compare(
         asset, own, reference, reference.get("measurements") if reference else None, assume_same_view
     )
-    items = findings(own, comparison)
+    review = build_review(asset, comparison)
+
+    def pick(value):
+        return local_text(value, locale)
+
+    words = (
+        {
+            "priorities": "主要关注点",
+            "metrics": "这球的动作数据",
+            "next": "下一组怎么练",
+            "check": "回看时检查",
+            "goal": "教学目标与差别",
+            "why": "为什么关注",
+            "action": "怎么调整",
+            "drill": "练习方法",
+            "limits": "当前画面的判断范围",
+            "strengths": "可以保留的动作",
+            "evidence": "证据源时间",
+            "high": "优先处理",
+            "medium": "建议先看",
+            "low": "细节练习",
+            "source": "教学依据",
+            "footer": "建议依据当前画面，需结合相同条件的多次投篮复核。",
+        }
+        if locale == "zh"
+        else {
+            "priorities": "Main priorities",
+            "metrics": "Movement at a glance",
+            "next": "Your next practice",
+            "check": "What to check",
+            "goal": "Teaching goal and visible gap",
+            "why": "Why it matters",
+            "action": "What to change",
+            "drill": "Practice",
+            "limits": "What this clip supports",
+            "strengths": "What to keep",
+            "evidence": "Source evidence time",
+            "high": "First priority",
+            "medium": "Review next",
+            "low": "Optional refinement",
+            "source": "Teaching sources",
+            "footer": "Suggestions use this view; confirm them across matched attempts.",
+        }
+    )
     key = ident("report")
     folder = settings.data_dir / "reports" / key
     folder.mkdir(parents=True)
+    items = [
+        {
+            "id": i["id"],
+            "attribute": i["rubric_id"],
+            "kind": "coaching_priority",
+            "evidence_frame_ids": i["evidence_frame_ids"],
+            "source_ids": i["source_ids"],
+            "severity": i["severity"],
+            "confidence": i["confidence"],
+            "coaching_status": "provisional",
+        }
+        for i in review["issues"]
+    ]
     body = {
         "id": key,
         "asset_id": asset["id"],
@@ -190,16 +275,74 @@ def build_report(
         "comparison": comparison,
         "measurements": own["measurements"],
         "findings": items,
+        "coaching": review,
         "flags": own["flags"],
         "coordinate_system": "image_projection",
-        "coaching_status": "hypothesis_to_test",
+        "coaching_status": "provisional",
         "cause_of_miss": None,
         "world_coordinates_validated": False,
         "measured_curry_motion": False,
     }
-    sources = json.loads((ROOT / "references/sources.json").read_text())
-    source_ids = {s for f in items for s in f["source_ids"]}
-    body["sources"] = [s for s in sources if s["id"] in source_ids]
+    catalog = json.loads((ROOT / "references/sources.json").read_text())
+    source_ids = {source for issue in review["issues"] for source in issue["source_ids"]} | {
+        "curry-mechanics",
+        "curry-form-practice",
+        "jr-nba-shooting",
+    }
+    body["sources"] = [source for source in catalog if source["id"] in source_ids]
+    by_id = {frame["frame_id"]: frame for frame in asset["frame_index"]}
+
+    def evidence_line(ids):
+        times = sorted(by_id[key]["source_time_us"] / 1e6 for key in ids if key in by_id)
+        return f"{words['evidence']}: {times[0]:.3f}–{times[-1]:.3f}s" if times else ""
+
+    report_text = [
+        f"# {t['title']} — {asset['label']}",
+        f"{t['revision']}: {asset['revision']}",
+        "",
+        "## " + pick(review["overall"]["headline"]),
+        pick(review["overall"]["summary"]),
+    ]
+    if review["issues"]:
+        report_text += ["", "## " + words["priorities"]]
+        for issue in review["issues"]:
+            report_text += [
+                "",
+                f"### {issue['rank']}. {pick(issue['title'])} · {words[issue['severity']]}",
+                pick(issue["observation"]),
+            ]
+            for name, label in [
+                ("standard_gap", "goal"),
+                ("why_it_matters", "why"),
+                ("action", "action"),
+                ("drill", "drill"),
+            ]:
+                report_text.append(f"- **{words[label]}**：{pick(issue[name])}")
+            report_text.append(evidence_line(issue["evidence_frame_ids"]))
+    if review["strengths"]:
+        report_text += ["", "## " + words["strengths"]]
+        report_text += [
+            f"- **{pick(item['title'])}**：{pick(item['detail'])}" for item in review["strengths"]
+        ]
+    report_text += ["", "## " + words["metrics"]]
+    report_text += [
+        f"- **{pick(metric['label'])}：{pick(metric['display_value'])}**。{pick(metric['interpretation'])}"
+        for metric in review["metrics"]
+    ]
+    plan = review["next_practice"]
+    report_text += [
+        "",
+        "## " + words["next"],
+        "**" + pick(plan["title"]) + "**",
+        pick(plan["instruction"]),
+        f"{words['check']}：{pick(plan['success_check'])}",
+        "",
+        "## " + words["limits"],
+    ]
+    report_text += ["- " + pick(item) for item in review["limitations"]]
+    report_text += ["", "## " + words["source"]]
+    report_text += [f"- [{source.get('title', source['id'])}]({source['url']})" for source in body["sources"]]
+    (folder / "report.md").write_text("\n".join(report_text) + "\n")
     anchor = release_anchor(asset["phases"])
     basis = "release" if anchor is not None else "extension_peak"
     if anchor is None:
@@ -209,87 +352,49 @@ def build_report(
     if reference and ref_anchor is None:
         peak = reference["phases"].get("extension_peak")
         ref_anchor = sum(peak["range_us"]) / 2 if peak else reference["duration_us"] / 2
-    report_text = [
-        f"# {t['title']} — {asset['label']}",
-        f"{t['revision']}: {asset['revision']}",
-        t["projection"],
-        "",
-    ]
-    for m in own["measurements"]:
-        note = t.get(m["reason"], "") if m.get("reason") else ""
-        report_text.append(f"- {t[m['key']]}: {formatted(m)} {t[m['unit']]} {note}")
-    release = asset["phases"].get("release")
-    report_text += [
-        "",
-        f"{t['release']}: "
-        + (" – ".join(f"{v / 1e6:.3f}s" for v in release["range_us"]) if release else t["unknown"]),
-        f"{t['reference']}: {reference['label'] if reference else t['no_ref']}",
-    ]
-    for difference in comparison["differences"]:
-        report_text.append(
-            f"- {t[difference['key']]}: {difference['value']:.2f} / "
-            f"{difference['reference_value']:.2f}; Δ {difference['difference']:+.2f} {t[difference['unit']]}"
-        )
-    report_text += ["", t["hypothesis"]]
-    for f in items:
-        report_text += [f"- {t[f['cue_id']]}", f"  evidence: {', '.join(f['evidence_frame_ids'])}"]
-    for flag in own["flags"]:
-        report_text += [t.get(flag, flag)]
-    if comparison.get("reason") in t:
-        report_text += [t[comparison["reason"]]]
-    if not items:
-        report_text += [t.get("release_unknown") if "release_unknown" in own["flags"] else t["track_gaps"]]
-    report_text += ["", t["limits"], t["phase_note"], "", "Sources:"]
-    report_text += [f"- {s.get('title', s['id'])}: {s['url']}" for s in body["sources"]]
-    (folder / "report.md").write_text("\n".join(report_text) + "\n")
 
     def compose(relative):
-        canvas = Image.new("RGB", (1280, 840), "#f1f4ee")
+        canvas = Image.new("RGB", (1280, 1000), "#f1f4ee")
         d = ImageDraw.Draw(canvas)
-        text(d, (24, 16), t["title"], 29, locale, bold=True)
-        text(d, (760, 22), f"{t['revision']} {asset['revision']}  |  {t['projection']}", 18, locale)
-        text(d, (24, 65), asset["label"][:45], 24, locale, bold=True)
-        text(d, (664, 65), (reference["label"] if reference else t["teaching"])[:45], 24, locale, bold=True)
-        a, ref_a = frame_image(settings, asset, track, relative, anchor, "#db9850")
-        b, ref_b = (
-            frame_image(settings, reference, ref_track, relative, ref_anchor, "#5daa89")
+        text(d, (24, 18), f"{t['title']} · {asset['label']}", 28, locale, bold=True)
+        text(d, (1080, 24), f"{t['revision']} {asset['revision']}", 17, locale)
+        paragraph(d, (24, 64), pick(review["overall"]["headline"]), 1210, 27, locale, lines=1)
+        text(d, (24, 112), asset["label"][:40], 21, locale, bold=True)
+        text(d, (664, 112), (reference["label"] if reference else t["teaching"])[:40], 21, locale, bold=True)
+        a, evidence_a = frame_image(settings, asset, track, relative, anchor, "#db9850", size=(640, 440))
+        b, evidence_b = (
+            frame_image(settings, reference, ref_track, relative, ref_anchor, "#5daa89", size=(640, 440))
             if reference
-            else (schematic((640, 480), locale), None)
+            else (schematic((640, 440), locale), None)
         )
-        canvas.paste(a, (0, 114))
-        canvas.paste(b, (640, 114))
         basis_label = t["release"] if basis == "release" else t["extension"]
         text(
             d,
-            (24, 99),
-            f"{basis_label}: {ref_a['displayed_relative_s']:+.2f}s  /  {t['source']} {ref_a['source_time_us'] / 1e6:.3f}s",
-            15,
+            (24, 140),
+            f"{basis_label} {evidence_a['displayed_relative_s']:+.2f}s · {t['source']} {evidence_a['source_time_us'] / 1e6:.3f}s",
+            14,
             locale,
         )
-        if ref_b:
-            text(d, (664, 99), f"{t['source']} {ref_b['source_time_us'] / 1e6:.3f}s", 15, locale)
-        y = 620
-        for m in own["measurements"][:4]:
-            # Four readable rows, kept away from the source pixels.
-            text(d, (24, y), f"{t[m['key']]}: {formatted(m)} {t[m['unit']]}", 20, locale)
-            y += 30
-        for row, difference in enumerate(comparison["differences"][:4]):
-            text(
-                d,
-                (664, 620 + row * 30),
-                f"{t[difference['key']]}: {difference['reference_value']:.2f}"
-                f"  / Δ {difference['difference']:+.2f}",
-                18,
-                locale,
-            )
-        text(d, (24, 755), t["hypothesis"], 21, locale, color="#28644e", bold=True)
-        text(d, (24, 800), t["phase_note"], 17, locale, color="#52685e")
-        return canvas, [r for r in [ref_a, ref_b] if r]
+        if evidence_b:
+            text(d, (664, 140), f"{t['source']} {evidence_b['source_time_us'] / 1e6:.3f}s", 14, locale)
+        canvas.paste(a, (0, 162))
+        canvas.paste(b, (640, 162))
+        for n, metric in enumerate(review["metrics"][:4]):
+            x = 24 + n * 315
+            d.rounded_rectangle((x, 624, x + 291, 757), radius=8, fill="#e4ebde")
+            paragraph(d, (x + 14, 638), pick(metric["label"]), 263, 18, locale, lines=2)
+            paragraph(d, (x + 14, 690), pick(metric["display_value"]), 263, 22, locale, lines=2)
+        issue = review["issues"][0] if review["issues"] else None
+        headline = words[issue["severity"]] + " · " + pick(issue["title"]) if issue else pick(plan["title"])
+        action = pick(issue["action"]) if issue else pick(plan["instruction"])
+        paragraph(d, (24, 789), headline, 1215, 25, locale, lines=1)
+        paragraph(d, (24, 835), action, 1215, 21, locale, lines=3)
+        text(d, (24, 963), words["footer"], 16, locale, color="#617362")
+        return canvas, [item for item in (evidence_a, evidence_b) if item]
 
-    image, image_refs = compose(0.7)
-    image.save(folder / "comparison.jpg", quality=93)
-    body["image_evidence"] = image_refs
-    movie = folder / "comparison.mp4"
+    still, image_evidence = compose(0.7)
+    still.save(folder / "comparison.jpg", quality=93)
+    body["image_evidence"] = image_evidence
     process = subprocess.Popen(
         [
             "ffmpeg",
@@ -301,7 +406,7 @@ def build_report(
             "-pix_fmt",
             "rgb24",
             "-s",
-            "1280x840",
+            "1280x1000",
             "-r",
             "25",
             "-i",
@@ -317,40 +422,39 @@ def build_report(
             "yuv420p",
             "-movflags",
             "+faststart",
-            str(movie),
+            str(folder / "comparison.mp4"),
         ],
         stdin=subprocess.PIPE,
     )
-    evidence = []
+    video_evidence = []
     try:
         for index in range(200):
             if cancelled and cancelled():
                 raise InterruptedError("cancelled")
-            relative = max(-0.6, min(0.8, -0.6 + (index / 25 - 1) * 0.4))
-            frame, refs = compose(relative)
+            frame, evidence = compose(max(-0.6, min(0.8, -0.6 + (index / 25 - 1) * 0.4)))
             process.stdin.write(frame.tobytes())
-            evidence.append({"output_frame": index, "output_time_s": index / 25, "evidence": refs})
-    except BaseException:
+            video_evidence.append({"output_frame": index, "output_time_s": index / 25, "evidence": evidence})
         process.stdin.close()
-        process.terminate()
-        process.wait()
+        if process.wait() != 0:
+            raise RuntimeError("Video export failed")
+    except BaseException:
+        if process.poll() is None:
+            process.terminate()
+            process.wait()
         raise
-    process.stdin.close()
-    if process.wait() != 0:
-        raise RuntimeError("Video export failed")
-    body["video_evidence"] = evidence
+    body["video_evidence"] = video_evidence
     body["render"] = {
         "fps": 25,
         "duration_s": 8,
+        "width": 1280,
+        "height": 1000,
         "slow_motion_speed": 0.4,
         "alignment_basis": basis,
-        "reference_alignment_basis": (
-            "release"
-            if reference and release_anchor(reference["phases"]) is not None
-            else "extension_candidate"
-            if reference
-            else "schematic"
-        ),
+        "reference_alignment_basis": "release"
+        if reference and release_anchor(reference["phases"]) is not None
+        else "extension_candidate"
+        if reference
+        else "schematic",
         "missing_context_policy": "clamp_to_available_frame_and_record_displayed_time",
     }
     body["artifacts"] = {

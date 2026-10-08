@@ -10,12 +10,14 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .analysis import measure
+from .coaching import build_review
 from .codex_runner import codex_status
 from .config import ROOT, Settings
 from .contracts import CreateAnalysis, ImportWorkbench, PhaseCorrection, ReportRequest
 from .db import Repository
 from .media import MediaError, import_workbench, ingest
 from .provider import ensure_ready
+from .review_data import current_measurements
 from .worker import Worker
 
 
@@ -44,6 +46,12 @@ def create_app(settings=None, start_worker=True):
             raise HTTPException(404, "not_found") from None
 
     def public(asset):
+        asset = current_measurements(settings, asset)
+        asset["coaching"] = build_review(asset)
+        if asset.get("report"):
+            asset["report"] = {
+                k: v for k, v in asset["report"].items() if k not in ("video_evidence", "image_evidence")
+            }
         return {
             **{k: v for k, v in asset.items() if k not in ("preview_path", "original_path", "tracks_path")},
             "preview_url": f"/api/assets/{asset['id']}/preview",
@@ -62,7 +70,7 @@ def create_app(settings=None, start_worker=True):
         return {
             "status": "ok",
             "app": "shot-form-coach",
-            "version": "0.3.0",
+            "version": "0.4.0",
             "gemini_configured": bool(settings.api_key),
             "gemini_model": settings.model_id,
             "astra_model": settings.astra_model,

@@ -92,3 +92,36 @@ A proposed live test on the user's private shooting clip was rejected by automat
 review because specific authorization to transmit that video to OpenAI was absent. No such
 request was submitted. Private-clip validation remains pending explicit user authorization.
 Direct Astra API and Gemini calls use controlled-response boundary tests in this update.
+
+## Human coaching review update (V0.4)
+
+49 backend tests and 5 frontend interaction tests pass, with the production TypeScript/Vite build.
+New coverage includes readable metrics, no-fault/limited-data states, source/frame/rubric validation,
+priority and confidence caps, stale model coaching after phase edits, historical-export protection,
+reference consistency, bilingual updates and evidence jumps. Finish timing is tested at 20/30/60/120 FPS,
+including occlusion, ambiguous hand positions and conservative censored lower bounds.
+
+A real Chrome session checked the local six-clip copy at desktop1440 and mobile390 widths.
+The summary, human metrics, source evidence navigation, frame stepping, unsaved correction controls,
+slow playback, pose visibility, model selection persistence and reference-sensitive export protection
+worked. Three ranked issue cards and expanded reasoning/drills were exercised using an explicitly
+marked synthetic UI fixture without a real person's video. Screenshots were captured and viewed;
+no horizontal overflow or browser console errors were found in the checked flows. Native browser
+200% zoom was not tested.
+
+A local report for the first clip and its personal comparator was regenerated from cached tracks,
+with no remote model request. The Markdown, JPEG and MP4 use the same coaching record. New video
+exports are 1280×1000, 25 FPS, 200 frames /8 seconds; a full FFmpeg decode passed.
+
+One live Astra/Codex request used only the eight previously generated synthetic stick-figure images
+and the new rubric/schema. It returned bilingual coaching plus phase and frame references
+(20,601 input tokens,416 output tokens). Initial validation incorrectly classified legitimate frame
+numbers in the prose as invented measurement values. That guard was corrected and regression-tested;
+the already received response then validated without another remote request. This verifies the
+transport and output contract, not coaching accuracy. No private shooting video was sent to a new
+model service during this update, and no real coaching issue was fabricated to fill the redesigned UI.
+
+The permanent app instance was upgraded to V0.4 and all six existing reports were rebuilt locally.
+All six rebuild jobs succeeded; each report's revision and every movie-frame source reference
+were checked, and all six newly rendered videos decoded end to end. The original clips and
+phase revisions were preserved. No remote model request was involved in that refresh.

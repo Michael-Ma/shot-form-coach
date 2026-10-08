@@ -1,5 +1,22 @@
 import { useEffect, useRef, useState } from "react";
 
+type Bilingual = { en: string; zh: string };
+type CoachingIssue = {
+  id: string; rubric_id: string; rank: number;
+  severity: "high" | "medium" | "low"; confidence: "high" | "medium" | "low";
+  title: Bilingual; observation: Bilingual; standard_gap: Bilingual;
+  why_it_matters: Bilingual; action: Bilingual; drill: Bilingual;
+  evidence_frame_ids: string[]; source_ids: string[]; basis: "measurement" | "model";
+};
+type Coaching = {
+  version: string; assessment_source?: "model" | "measurements"; status: "reviewed" | "limited" | "awaiting_analysis";
+  overall: { headline: Bilingual; summary: Bilingual };
+  metrics: { id: string; label: Bilingual; display_value: Bilingual; interpretation: Bilingual; status: "measured" | "unavailable"; evidence_frame_ids: string[] }[];
+  strengths: { title: Bilingual; detail: Bilingual; evidence_frame_ids: string[] }[];
+  issues: CoachingIssue[];
+  next_practice: { title: Bilingual; instruction: Bilingual; success_check: Bilingual };
+  limitations: Bilingual[]; rubric_version: string;
+};
 type Point = { x: number; y: number; visibility: number };
 type Frame = {
   frame_id: string;
@@ -37,6 +54,9 @@ type Finding = {
 type Report = {
   id: string;
   locale: string;
+  coaching?: Coaching;
+  reference_id?: string | null;
+  reference_revision?: number | null;
   asset_revision: number;
   findings: Finding[];
   comparison: {
@@ -65,11 +85,14 @@ type Asset = {
     visible_frames: number;
     total_frames: number;
   };
+  coaching?: Coaching;
   report: Report | null;
-  report_request?: { reference_asset_id?: string };
+  report_request?: { reference_asset_id?: string; assume_same_view?: boolean };
   model_error?: string;
   analysis_config?: { mode: string };
   model_assist?: {
+    asset_revision?: number;
+    coaching?: unknown;
     observations: {
       attribute: string;
       interpretation: string;
@@ -531,20 +554,6 @@ function Pose({
     </svg>
   );
 }
-function Sketch({ t }: { t: (key: string) => string }) {
-  return (
-    <div className="sketch">
-      <svg viewBox="0 0 320 280" aria-label={t("schematic")}>
-        <path className="target" d="M240 49h48m-42 0 5 18h20l5-18" />
-        <path className="flight" d="M120 63 Q192 -7 260 45" />
-        <circle cx="126" cy="112" r="17" />
-        <path d="M125 130 130 179 110 227 118 258m12-79 30 46 20 34M125 137 101 108 99 69 114 64m15 79 23-35 12-23" />
-      </svg>
-      <strong>{t("schematic")}</strong>
-      <p>{t("schematicNote")}</p>
-    </div>
-  );
-}
 function Curve({
   asset,
   current,
@@ -622,899 +631,303 @@ function Curve({
     </div>
   );
 }
+const REVIEW_EN: Record<string, string> = {
+  release_wrist_height: "Wrist height at release", release_wrist_above_face: "Wrist position above the face", release_elbow_angle: "Elbow angle at release", finish_above_shoulder_ms: "Visible raised-hand finish",
+  release_interval_wide: "The release interval is too wide for a precise measurement.", finish_position_uncertain: "The shooting hand position is not clear enough.",
+  movementSummary: "Movement summary", visualReview: "Visual coaching review", upgradeReview: "This is a movement summary. Choose Gemini or Astra, then analyze to add a broader review and practice priorities.", providerReady: "Available", reviewedInterval: "Reviewed interval",
+  subtitle: "Know what to work on. Take it to your next session.",
+  review: "Your shooting review", overview: "The takeaway", priorities: "What to work on first",
+  priorityNote: "Ranked by training attention. Confidence describes how clearly this video supports the observation.",
+  high: "First priority", medium: "Next priority", low: "Refine later", confidence: "Evidence confidence",
+  confidence_high: "High", confidence_medium: "Medium", confidence_low: "Limited",
+  observation: "In your shot", standardGap: "Teaching goal", why: "Why it matters", tryThis: "Try this",
+  drill: "Practice drill", detail: "Reasoning & drill", nextPractice: "Your next practice", success: "What to check",
+  strengths: "Keep doing", metrics: "Your movement, in numbers", metricsNote: "Measurements describe this clip. They are not a universal form score.",
+  noIssues: "No supported correction to rank yet", noIssuesHelp: "A clear release and enough follow-through help identify a useful change. This is not a clean bill of technique.",
+  limited: "Partial review", reviewed: "Review ready", awaiting_analysis: "Ready to analyze",
+  reviewPending: "Let's look at this shot", reviewPendingHelp: "Analyze the clip to get a short review, your main practice priorities, and the frames behind them.",
+  legacyHelp: "This clip has movement measurements. Run analysis to generate the new coaching review.",
+  analyzingTitle: "Looking at your movement", analyzingHelp: "We are finding the shooting phases and preparing your review. You can keep browsing other shots.",
+  evidenceSection: "See it in your shot", evidenceNote: "Play the movement, or jump directly to the frames behind a finding.",
+  timeline: "Video position", releaseJump: "Go to release", slow: "Playback speed", currentShot: "This shot",
+  selectedEvidence: "Showing the evidence for", reviewTools: "Frame tools & release correction",
+  advanced: "Analysis settings", providers: "Model availability", methodHint: "Local vision measures movement. Gemini or Astra can add a visual coaching review.",
+  uploadHint: "Up to 30 seconds · video only", moreImport: "Import from Workbench", noReference: "No comparison selected",
+  comparator: "Compare with another of your shots", comparisonNote: "Your reference is a personal example, not an ideal or standard shot.",
+  compare: "Update comparison", comparisonDraft: "The reference changed. Update the comparison to see matching results and exports.",
+  comparisonLabel: "Saved comparison", noComparison: "Choose a reference to explore your consistency.",
+  matchingRelease: "Aligned at release", approximateAlignment: "Approximate alignment · release not confirmed",
+  refreshExports: "Prepare matching exports", exportPending: "Prepare exports for the current shot, reference, and language.",
+  downloads: "Save or share this review", sourceDetail: "Teaching basis & review limits", raw: "Detailed measurements", rawHelp: "Projected measurements depend on camera angle and visible landmarks.",
+  unavailable: "Not measurable", showEvidence: "Show this moment", returnReview: "Back to review", analyzingOther: "Processing your clips",
+  fresh: "New review", report: "Prepare review & exports", modelReview: "Additional model observations",
+  noShots: "Your next improvement starts with one shot.", emptyHelp: "Upload a short clip with your full body and the ball visible. We'll help you choose what to practice first.",
+  import: "Add a shot", local: "Local vision", release: "Correct the release interval", details: "More details",
+  referenceUsed: "Reference used", loadingShots: "Loading your shots…", setup: "Setup needed", exportsLanguage: "Saved export language",
+};
+const REVIEW_ZH: Record<string, string> = {
+  release_wrist_height: "离手时腕部高度", release_wrist_above_face: "腕部高于面部的位置", release_elbow_angle: "离手时肘部投影角度", finish_above_shoulder_ms: "可见的抬手保持时长",
+  release_interval_wide: "离手区间较宽，暂不能精确测量。", finish_position_uncertain: "投篮手的位置不够清楚。",
+  movementSummary: "动作摘要", visualReview: "画面综合复盘", upgradeReview: "当前为动作摘要。选择 Gemini 或 Astra 后点击分析，可补充综合评价与练习重点。", providerReady: "可用", reviewedInterval: "已复核区间",
+  subtitle: "看懂问题，把一个调整带到下次训练。",
+  review: "这次投篮复盘", overview: "先看结论", priorities: "先练这几件事",
+  priorityNote: "按训练关注优先级排序；证据把握表示这段视频能否清楚支持观察。",
+  high: "优先改善", medium: "接着调整", low: "后续打磨", confidence: "证据把握",
+  confidence_high: "较高", confidence_medium: "中等", confidence_low: "有限",
+  observation: "你这一球", standardGap: "教学目标", why: "为什么值得关注", tryThis: "怎么调整",
+  drill: "具体练法", detail: "展开依据与练法", nextPractice: "下一次这样练", success: "练完检查什么",
+  strengths: "继续保持", metrics: "几个看得懂的动作数据", metricsNote: "这些数值描述这次动作，不代表统一的姿势评分。",
+  noIssues: "目前还不能可靠地列出技术问题", noIssuesHelp: "清楚的离手过程和完整的随挥有助于找到调整方向。没有列出问题，并不代表动作已经达标。",
+  limited: "部分可判断", reviewed: "复盘已就绪", awaiting_analysis: "等待分析",
+  reviewPending: "来看看这次投篮", reviewPendingHelp: "分析后，你会看到整体评价、主要调整方向，以及支持判断的视频画面。",
+  legacyHelp: "这段视频已有动作数据。重新分析后，可以生成新版综合复盘。",
+  analyzingTitle: "正在观察你的动作", analyzingHelp: "正在识别投篮阶段并整理复盘。期间仍可查看其他投篮。",
+  evidenceSection: "回到视频，看清这个动作", evidenceNote: "播放完整动作，也可以从问题卡片直接跳到对应画面。",
+  timeline: "视频位置", releaseJump: "跳到离手", slow: "播放速度", currentShot: "这一球",
+  selectedEvidence: "当前查看", reviewTools: "逐帧工具与离手修正",
+  advanced: "分析设置", providers: "模型可用情况", methodHint: "本地视觉测量动作；Gemini 或 Astra 可补充画面复盘。",
+  uploadHint: "30 秒以内 · 视频片段", moreImport: "从 Workbench 导入", noReference: "暂不对比",
+  comparator: "和自己的另一球对比", comparisonNote: "参照是你自己的一个样本，不会被当作标准或理想动作。",
+  compare: "更新对比", comparisonDraft: "参照已变化。更新对比后，再查看对应结果与导出文件。",
+  comparisonLabel: "当前已保存的对比", noComparison: "选一球作参照，看看自己的动作是否一致。",
+  matchingRelease: "按离手时刻对齐", approximateAlignment: "近似对齐 · 离手尚未确认",
+  refreshExports: "准备对应导出文件", exportPending: "为当前投篮、参照和语言准备导出文件。",
+  downloads: "保存或分享这次复盘", sourceDetail: "教学依据与判断范围", raw: "查看详细测量", rawHelp: "画面投影测量受拍摄视角和关键点可见性影响。",
+  unavailable: "暂无法测量", showEvidence: "看这个动作", returnReview: "回到评价", analyzingOther: "正在处理投篮片段",
+  fresh: "本次复盘", report: "生成复盘与导出", modelReview: "模型补充观察",
+  noShots: "从一球开始，找到下一步。", emptyHelp: "上传一个能看清全身和篮球的短片段，先找到最值得练习的调整。",
+  import: "添加投篮", local: "本地视觉", release: "修正离手区间", details: "更多细节",
+  referenceUsed: "使用的参照", loadingShots: "正在加载你的投篮…", setup: "需要配置", exportsLanguage: "已保存报告语言",
+};
 export default function App() {
-  const [lang, setLang] = useState(
-    () => localStorage.getItem("sfc-lang") || "en",
-  );
-  const t = (k: string) => (lang === "zh" ? ZH : EN)[k] || EN[k] || k;
-  const [assets, setAssets] = useState<Asset[]>([]),
-    [selected, setSelected] = useState(""),
-    [tracks, setTracks] = useState<TrackFrame[]>([]),
-    [refTracks, setRefTracks] = useState<TrackFrame[]>([]),
-    [reference, setReference] = useState(""),
-    [sameView, setSameView] = useState(false),
-    [jobs, setJobs] = useState<Job[]>([]),
-    [health, setHealth] = useState<{
-      gemini_configured: boolean;
-      astra_api_configured: boolean;
-      codex: { ready: boolean; reason: string | null };
-      models_ready: boolean;
-    }>(),
-    [runs, setRuns] = useState<{ id: string; clip_count: number }[]>([]),
-    [run, setRun] = useState("");
+  const [lang, setLang] = useState(() => localStorage.getItem("sfc-lang") || "en");
+  const t = (k: string) => (lang === "zh" ? REVIEW_ZH : REVIEW_EN)[k] || (lang === "zh" ? ZH : EN)[k] || EN[k] || k;
+  const cText = (value: Bilingual | undefined) => value ? value[lang === "zh" ? "zh" : "en"] || value.en || "" : "";
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [selected, setSelected] = useState("");
+  const [tracks, setTracks] = useState<TrackFrame[]>([]);
+  const [refTracks, setRefTracks] = useState<TrackFrame[]>([]);
+  const [reference, setReference] = useState("");
+  const [sameView, setSameView] = useState(false);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [health, setHealth] = useState<{ gemini_configured: boolean; astra_api_configured: boolean; codex: { ready: boolean; reason: string | null }; models_ready: boolean }>();
+  const [runs, setRuns] = useState<{ id: string; clip_count: number }[]>([]);
+  const [run, setRun] = useState("");
   const [focused, setFocused] = useState(true);
-  const [index, setIndex] = useState(0),
-    [playing, setPlaying] = useState(false),
-    [showPose, setShowPose] = useState(true),
-    [last, setLast] = useState<number | null>(null),
-    [first, setFirst] = useState<number | null>(null),
-    [mode, setMode] = useState("local"),
-    [hand, setHand] = useState("auto"),
-    [view, setView] = useState("oblique"),
-    [shot, setShot] = useState("stationary_jump_shot"),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const video = useRef<HTMLVideoElement>(null),
-    refVideo = useRef<HTMLVideoElement>(null),
-    upload = useRef<HTMLInputElement>(null);
-  const chosen = assets.find((a) => a.id === selected),
-    ref = assets.find((a) => a.id === reference);
-  const active = jobs.some(
-    (j) => j.status === "running" || j.status === "queued",
-  );
+  const [index, setIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [showPose, setShowPose] = useState(false);
+  const [last, setLast] = useState<number | null>(null);
+  const [first, setFirst] = useState<number | null>(null);
+  const [mode, setMode] = useState(() => { const saved = localStorage.getItem("sfc-mode"); return saved && ["local", "gemini", "astra_codex", "astra_api"].includes(saved) ? saved : "local"; });
+  const [hand, setHand] = useState("auto");
+  const [view, setView] = useState("oblique");
+  const [shot, setShot] = useState("stationary_jump_shot");
+  const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState("");
+  const [speed, setSpeed] = useState("0.5");
+  const [evidenceLabel, setEvidenceLabel] = useState("");
+  const video = useRef<HTMLVideoElement>(null);
+  const upload = useRef<HTMLInputElement>(null);
+  const evidenceSection = useRef<HTMLElement>(null);
+  const summarySection = useRef<HTMLElement>(null);
+  const chosen = assets.find((a) => a.id === selected);
+  const ref = assets.find((a) => a.id === reference);
+  const active = jobs.some((j) => ["running", "queued"].includes(j.status));
+  const generating = active || busy;
+  const analyzingChosen = chosen?.status === "analyzing";
+  const ready = !!chosen?.measurements;
+  const report = chosen?.report;
+  const coaching = chosen?.coaching || (report?.asset_revision === chosen?.revision ? report?.coaching : undefined);
+  const hasVisualReview = coaching?.assessment_source === "model";
+  const issues = [...(coaching?.issues || [])].sort((a, b) => a.rank - b.rank).slice(0, 3);
+  const reportReference = report?.reference_id ?? chosen?.report_request?.reference_asset_id ?? "";
+  const reportMatches = !!report && report.asset_revision === chosen?.revision && reportReference === reference &&
+    (!ref || report.reference_revision === ref.revision) &&
+    (!reference || sameView === !!chosen?.report_request?.assume_same_view);
+  const exportMatches = reportMatches && report?.locale === lang && !!report?.coaching && report.coaching.version === coaching?.version;
+  const validSave = last !== null && first !== null && last <= first;
   async function refresh() {
-    const [a, j] = await Promise.all([
-      api<Asset[]>("/assets"),
-      api<Job[]>("/jobs"),
-    ]);
-    setAssets(a);
-    setJobs(j);
-    setSelected((s) => s || a[a.length - 1]?.id || "");
+    const [a, j] = await Promise.all([api<Asset[]>("/assets"), api<Job[]>("/jobs")]);
+    setAssets(a); setJobs(j); setLoaded(true);
+    setSelected((s) => a.some((v) => v.id === s) ? s : a[a.length - 1]?.id || "");
   }
   useEffect(() => {
-    void refresh().catch((e) => setError(e.message));
-    void api<typeof health>("/health").then(setHealth);
-    void api<typeof runs>("/workbench/runs").then((r) => {
-      setRuns(r);
-      setRun(r[0]?.id || "");
-    });
+    void refresh().catch((e) => { setError(e.message); setLoaded(true); });
+    void api<typeof health>("/health").then(setHealth).catch((e) => setError(e.message));
+    void api<typeof runs>("/workbench/runs").then((r) => { setRuns(r); setRun(r[0]?.id || ""); }).catch(() => {});
   }, []);
   useEffect(() => {
     if (!active) return;
-    const timer = setInterval(
-      () => void refresh().catch((e) => setError(e.message)),
-      1200,
-    );
+    const timer = setInterval(() => void refresh().catch((e) => setError(e.message)), 1200);
     return () => clearInterval(timer);
   }, [active]);
   useEffect(() => {
-    setIndex(0);
-    setPlaying(false);
-    setLast(null);
-    setFirst(null);
+    setIndex(0); setPlaying(false); setLast(null); setFirst(null); setEvidenceLabel("");
     setReference(chosen?.report_request?.reference_asset_id || "");
-    setTracks([]);
-    if (selected)
-      void api<{ frames: TrackFrame[] }>(`/assets/${selected}/tracks`)
-        .then((r) => setTracks(r.frames))
-        .catch(() => {});
+    setSameView(!!chosen?.report_request?.assume_same_view);
   }, [selected]);
   useEffect(() => {
-    if (chosen?.measurements && !tracks.length)
-      void api<{ frames: TrackFrame[] }>(`/assets/${selected}/tracks`)
-        .then((r) => setTracks(r.frames))
-        .catch(() => {});
-  }, [chosen?.measurements, tracks.length, selected]);
+    let live = true;
+    setTracks([]);
+    if (selected && ready) void api<{ frames: TrackFrame[] }>(`/assets/${selected}/tracks`).then((r) => { if (live) setTracks(r.frames); }).catch(() => {});
+    return () => { live = false; };
+  }, [selected, chosen?.revision, ready]);
   useEffect(() => {
+    let live = true;
     setRefTracks([]);
-    if (reference)
-      void api<{ frames: TrackFrame[] }>(`/assets/${reference}/tracks`)
-        .then((r) => setRefTracks(r.frames))
-        .catch(() => {});
-  }, [reference]);
-  useEffect(() => {
-    document.documentElement.lang = lang;
-    localStorage.setItem("sfc-lang", lang);
-  }, [lang]);
-  const ownCrop = chosen ? crop(chosen, tracks, focused) : [0, 0, 1, 1],
-    refCrop = ref ? crop(ref, refTracks, focused) : [0, 0, 1, 1];
-  const ownAnchor = chosen ? anchor(chosen) : null,
-    refAnchor = ref ? anchor(ref) : null,
-    relative = chosen
-      ? (chosen.frame_index[index]?.time_us || 0) -
-        (ownAnchor ?? chosen.duration_us / 2)
-      : 0,
-    refIndex = ref
-      ? nearest(ref, (refAnchor ?? ref.duration_us / 2) + relative)
-      : 0;
-  useEffect(() => {
-    if (!refVideo.current || !ref) return;
-    const target = ref.frame_index[refIndex].time_us / 1e6;
-    if (Math.abs(refVideo.current.currentTime - target) > 0.04)
-      refVideo.current.currentTime = target;
-  }, [refIndex, reference]);
+    if (reference) void api<{ frames: TrackFrame[] }>(`/assets/${reference}/tracks`).then((r) => { if (live) setRefTracks(r.frames); }).catch(() => {});
+    return () => { live = false; };
+  }, [reference, ref?.revision]);
+  useEffect(() => { document.documentElement.lang = lang; localStorage.setItem("sfc-lang", lang); setEvidenceLabel(""); }, [lang]);
+  useEffect(() => { localStorage.setItem("sfc-mode", mode); }, [mode]);
+  useEffect(() => { if (video.current) video.current.playbackRate = Number(speed); }, [speed, selected]);
+  const ownCrop = chosen ? crop(chosen, tracks, focused) : [0, 0, 1, 1];
+  const refCrop = ref ? crop(ref, refTracks, focused) : [0, 0, 1, 1];
+  const ownAnchor = chosen ? anchor(chosen) : null;
+  const refAnchor = ref ? anchor(ref) : null;
+  const relative = chosen ? (chosen.frame_index[index]?.time_us || 0) - (ownAnchor ?? chosen.duration_us / 2) : 0;
+  const refIndex = ref ? nearest(ref, (refAnchor ?? ref.duration_us / 2) + relative) : 0;
   async function action(fn: () => Promise<void>) {
-    setBusy(true);
-    setError("");
-    try {
-      await fn();
-      await refresh();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+    setBusy(true); setError("");
+    try { await fn(); await refresh(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   async function analyze(ids: string[]) {
-    await api("/analyses", {
-      ...post({
-        asset_ids: ids,
-        config: {
-          mode,
-          handedness: hand,
-          camera_view: view,
-          shot_type: shot,
-          locale: lang,
-          max_model_calls: 6,
-        },
-      }),
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": crypto.randomUUID(),
-      },
-    });
+    await api("/analyses", { ...post({ asset_ids: ids, config: { mode, handedness: hand, camera_view: view, shot_type: shot, locale: lang, max_model_calls: 6 } }), headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() } });
   }
   function seek(n: number) {
-    if (!chosen) return;
-    setPlaying(false);
-    video.current?.pause();
+    if (!chosen?.frame_index.length) return;
+    setPlaying(false); video.current?.pause();
     const i = Math.max(0, Math.min(chosen.frame_index.length - 1, n));
     setIndex(i);
-    if (video.current)
-      video.current.currentTime = chosen.frame_index[i].time_us / 1e6;
+    if (video.current) video.current.currentTime = chosen.frame_index[i].time_us / 1e6;
+  }
+  const scrollBehavior = (): ScrollBehavior => window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ? "auto" : "smooth";
+  function showEvidence(ids: string[], label: string) {
+    if (!chosen) return;
+    const n = chosen.frame_index.findIndex((f) => ids.includes(f.frame_id));
+    if (n < 0) return;
+    seek(n); setEvidenceLabel(label);
+    evidenceSection.current?.scrollIntoView({ behavior: scrollBehavior(), block: "start" });
+    evidenceSection.current?.focus({ preventScroll: true });
   }
   async function save() {
     if (!chosen || last === null || first === null) return;
-    await api(`/assets/${chosen.id}/phases`, {
-      ...post({
-        expected_revision: chosen.revision,
-        locale: lang,
-        last_contact_frame: last,
-        first_clear_frame: first,
-      }),
-      method: "PUT",
-    });
-    setLast(null);
-    setFirst(null);
+    await api(`/assets/${chosen.id}/phases`, { ...post({ expected_revision: chosen.revision, locale: lang, last_contact_frame: last, first_clear_frame: first }), method: "PUT" });
+    setLast(null); setFirst(null);
   }
-  const report = chosen?.report;
-  const ready = !!chosen?.measurements;
-  const generating = active || busy;
-  const validSave = last !== null && first !== null && last <= first;
+  async function updateReport() {
+    if (!chosen) return;
+    await api(`/assets/${selected}/reports`, post({ expected_revision: chosen.revision, reference_asset_id: reference || null, locale: lang, assume_same_view: sameView }));
+  }
+  const evidenceButton = (ids: string[], label: string) => ids.length > 0 ? <button className="text-button evidence-link" onClick={() => showEvidence(ids, label)}>{t("showEvidence")} <span aria-hidden="true">↗</span></button> : null;
+  const modeReady = mode === "local" || (mode === "gemini" ? !!health?.gemini_configured : mode === "astra_codex" ? !!health?.codex?.ready : !!health?.astra_api_configured);
+  const modeProblem = mode === "gemini" ? "noKey" : mode === "astra_codex" ? health?.codex?.reason || "codex_not_installed" : "openai_key_missing";
+  const canStart = !generating && health?.models_ready !== false && modeReady;
+  const canAnalyze = canStart && !!chosen;
+  const methodSelect = <label className="method-select">{t("mode")}<select value={mode} onChange={(e) => setMode(e.target.value)} disabled={generating}>
+    <option value="local">{t("local")}</option><option value="gemini" disabled={!health?.gemini_configured}>{t("gemini")}{!health?.gemini_configured ? ` · ${t("setup")}` : ""}</option><option value="astra_codex" disabled={!health?.codex?.ready}>{t("astra_codex")}{!health?.codex?.ready ? ` · ${t("setup")}` : ""}</option><option value="astra_api" disabled={!health?.astra_api_configured}>{t("astra_api")}{!health?.astra_api_configured ? ` · ${t("setup")}` : ""}</option>
+  </select></label>;
   return (
     <>
-      <header>
-        <a className="brand" href="/">
-          <span className="mark">↗</span>
-          <div>
-            <strong>{t("title")}</strong>
-            <small>{t("subtitle")}</small>
-          </div>
-        </a>
-        <div className="language" aria-label="Language">
-          <button
-            className={lang === "en" ? "selected" : ""}
-            onClick={() => setLang("en")}
-          >
-            EN
-          </button>
-          <button
-            className={lang === "zh" ? "selected" : ""}
-            onClick={() => setLang("zh")}
-          >
-            中文
-          </button>
-        </div>
+      <header className="app-header">
+        <a className="brand" href="/"><span className="mark" aria-hidden="true">↗</span><div><strong>{t("title")}</strong><small>{t("subtitle")}</small></div></a>
+        <div className="language" aria-label="Language"><button aria-pressed={lang === "en"} className={lang === "en" ? "selected" : ""} onClick={() => setLang("en")}>EN</button><button aria-pressed={lang === "zh"} className={lang === "zh" ? "selected" : ""} onClick={() => setLang("zh")}>中文</button></div>
       </header>
       <main>
-        <aside className="sidebar">
-          <div className="section-title">
-            <h2>{t("session")}</h2>
-            <span className="count">{assets.length}</span>
-          </div>
-          <p className="muted">{t("cameraHint")}</p>
-          <input
-            type="file"
-            accept="video/*"
-            hidden
-            ref={upload}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f)
-                void action(async () => {
-                  const form = new FormData();
-                  form.append("file", f);
-                  const a = await api<Asset>("/assets/upload", {
-                    method: "POST",
-                    body: form,
-                  });
-                  setSelected(a.id);
-                  await analyze([a.id]);
-                });
-              e.target.value = "";
-            }}
-          />
-          <button
-            className="import"
-            disabled={generating}
-            onClick={() => upload.current?.click()}
-          >
-            ＋ {t("import")}
-          </button>
-          {runs.length > 0 && (
-            <div className="workbench">
-              <select
-                aria-label={t("workbench")}
-                value={run}
-                onChange={(e) => setRun(e.target.value)}
-              >
-                {runs.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.id.slice(-8)} · {r.clip_count}
-                  </option>
-                ))}
-              </select>
-              <button
-                disabled={generating || !run}
-                onClick={() =>
-                  void action(async () => {
-                    const a = await api<Asset[]>(
-                      "/workbench/import",
-                      post({ run_id: run }),
-                    );
-                    if (a.length) {
-                      setSelected(a[0].id);
-                      await analyze(a.map((v) => v.id));
-                    }
-                  })
-                }
-              >
-                {t("workbench")}
-              </button>
+        <aside className="sidebar" aria-label={t("session")}>
+          <div className="section-title"><h2>{t("session")}</h2><span className="count">{assets.length}</span></div>
+          <input type="file" accept="video/*" hidden ref={upload} onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void action(async () => {
+              const form = new FormData(); form.append("file", file);
+              const a = await api<Asset>("/assets/upload", { method: "POST", body: form });
+              setSelected(a.id); await analyze([a.id]);
+            });
+            e.target.value = "";
+          }} />
+          <button className="import" disabled={!canStart} onClick={() => upload.current?.click()}>＋ {t("import")}</button>
+          <p className="upload-hint">{t("uploadHint")}</p>
+          <nav className="shot-list" aria-label={t("session")}>
+            {assets.slice().reverse().map((a) => <button className={`shot ${selected === a.id ? "current" : ""}`} aria-current={selected === a.id ? "true" : undefined} key={a.id} onClick={() => setSelected(a.id)}>
+              <img src={`/api/assets/${a.id}/frames/${Math.max(0, Math.min(10, a.frame_index.length - 1))}`} alt="" loading="lazy" />
+              <span><strong>{a.label}</strong><small>{t(a.status)} · {(a.duration_us / 1e6).toFixed(1)}s</small></span>
+              {selected === a.id && <span className="shot-arrow" aria-hidden="true">↗</span>}
+            </button>)}
+          </nav>
+          <details className="sidebar-disclosure analysis-settings">
+            <summary>{t("advanced")}<span>{t(mode)}</span></summary>
+            <div className="settings">
+              <p className="muted">{t(mode === "local" ? "methodHint" : mode === "astra_codex" ? "codexHint" : "apiHint")}</p>
+              <details className="provider-help"><summary>{t("providers")}</summary><ul>
+                {!health?.gemini_configured && <li>Gemini: {t("noKey")}</li>}
+                {!health?.codex?.ready && <li>Astra / Codex: {t(health?.codex?.reason || "codex_not_installed")}</li>}
+                {!health?.astra_api_configured && <li>Astra / API: {t("openai_key_missing")}</li>}
+                {health?.gemini_configured && <li>Gemini · {t("providerReady")}</li>}
+                {health?.codex?.ready && <li>Astra / Codex · {t("providerReady")}</li>}
+                {health?.astra_api_configured && <li>Astra / API · {t("providerReady")}</li>}
+              </ul></details>
+              <div className="settings-row"><label>{t("hand")}<select value={hand} onChange={(e) => setHand(e.target.value)}>{["auto", "right", "left"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label><label>{t("view")}<select value={view} onChange={(e) => setView(e.target.value)}>{["oblique", "side", "front", "unknown"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label></div>
+              <label>{t("shot")}<select value={shot} onChange={(e) => setShot(e.target.value)}>{["stationary_jump_shot", "set_shot", "unknown"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
+              <button disabled={!canStart || !assets.length} onClick={() => void action(() => analyze(assets.map((a) => a.id)))}>{t("all")}</button>
             </div>
-          )}
-          <div className="shot-list">
-            {assets
-              .slice()
-              .reverse()
-              .map((a, n) => (
-                <button
-                  className={`shot ${selected === a.id ? "current" : ""}`}
-                  key={a.id}
-                  onClick={() => setSelected(a.id)}
-                >
-                  <img
-                    src={`/api/assets/${a.id}/frames/${Math.min(10, a.frame_index.length - 1)}`}
-                    alt=""
-                  />
-                  <span>
-                    <strong>{a.label}</strong>
-                    <small>
-                      {t(a.status)} · {(a.duration_us / 1e6).toFixed(1)}s
-                    </small>
-                  </span>
-                  <i>{String(n + 1).padStart(2, "0")}</i>
-                </button>
-              ))}
-          </div>
-          <div className="settings">
-            <label>
-              {t("mode")}
-              <select value={mode} onChange={(e) => setMode(e.target.value)}>
-                <option value="local">{t("local")}</option>
-                <option value="gemini" disabled={!health?.gemini_configured}>
-                  {t("gemini")}
-                </option>
-                <option value="astra_codex" disabled={!health?.codex.ready}>
-                  {t("astra_codex")}
-                </option>
-                <option
-                  value="astra_api"
-                  disabled={!health?.astra_api_configured}
-                >
-                  {t("astra_api")}
-                </option>
-              </select>
-            </label>
-            {mode !== "local" && (
-              <p className="muted">
-                {t(mode === "astra_codex" ? "codexHint" : "apiHint")}
-              </p>
-            )}
-            <div className="settings-row">
-              <label>
-                {t("hand")}
-                <select value={hand} onChange={(e) => setHand(e.target.value)}>
-                  {["auto", "right", "left"].map((v) => (
-                    <option key={v} value={v}>
-                      {t(v)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                {t("view")}
-                <select value={view} onChange={(e) => setView(e.target.value)}>
-                  {["oblique", "side", "front", "unknown"].map((v) => (
-                    <option key={v} value={v}>
-                      {t(v)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label>
-              {t("shot")}
-              <select value={shot} onChange={(e) => setShot(e.target.value)}>
-                {["stationary_jump_shot", "set_shot", "unknown"].map((v) => (
-                  <option key={v} value={v}>
-                    {t(v)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="primary"
-              disabled={generating || !chosen}
-              onClick={() => void action(() => analyze([selected]))}
-            >
-              {t("analyze")}
-            </button>
-            <button
-              disabled={generating || !assets.length}
-              onClick={() =>
-                void action(() => analyze(assets.map((a) => a.id)))
-              }
-            >
-              {t("all")}
-            </button>
-            {!health?.models_ready && (
-              <p className="notice">{t("missingModels")}</p>
-            )}
-          </div>
+          </details>
+          {runs.length > 0 && <details className="sidebar-disclosure"><summary>{t("moreImport")}</summary><div className="workbench"><select aria-label={t("workbench")} value={run} onChange={(e) => setRun(e.target.value)}>{runs.map((r) => <option key={r.id} value={r.id}>{r.id.slice(-8)} · {r.clip_count}</option>)}</select><button disabled={!canStart || !run} onClick={() => void action(async () => { const a = await api<Asset[]>("/workbench/import", post({ run_id: run })); if (a.length) { setSelected(a[0].id); await analyze(a.map((v) => v.id)); } })}>{t("workbench")}</button></div></details>}
+          {health?.models_ready === false && <p className="notice">{t("missingModels")}</p>}
+          <p className="sidebar-note">{t("cameraHint")}</p>
         </aside>
-        <section className="workspace">
-          {error && (
-            <div className="error" role="alert">
-              {t(error)}
-            </div>
-          )}
-          {chosen ? (
-            <>
-              <div className="review-heading">
-                <div>
-                  <span className="eyebrow">{t("review")}</span>
-                  <h1>{chosen.label}</h1>
-                </div>
-                <div>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={focused}
-                      onChange={(e) => setFocused(e.target.checked)}
-                    />
-                    {t("focus")}
-                  </label>
-                  <span className="pill">
-                    {t("revision")} {chosen.revision}
-                  </span>
-                </div>
+        <div className="workspace">
+          {error && <div className="error" role="alert">{t(error)}</div>}
+          {!loaded ? <div className="empty" role="status">{t("loadingShots")}</div> : chosen ? <>
+            <div className="review-heading"><div><span className="eyebrow">{t("review")}</span><h1>{chosen.label}</h1></div><div className="review-actions">{methodSelect}<button className="primary analyze-button" disabled={!canAnalyze} onClick={() => void action(() => analyze([selected]))}>{analyzingChosen ? t("analyzing") : t("analyze")} <span aria-hidden="true">↗</span></button>{mode !== "local" && <p className="mode-note">{t(modeReady ? mode === "astra_codex" ? "codexHint" : "apiHint" : modeProblem)}</p>}</div></div>
+            {analyzingChosen ? <section className="coaching-summary processing" role="status"><span className="eyebrow">{t("analyzing")}</span><h2>{t("analyzingTitle")}</h2><p>{t("analyzingHelp")}</p><progress aria-label={t("analyzing")} /></section> : coaching && coaching.status !== "awaiting_analysis" ? <>
+              <section className="coaching-summary" ref={summarySection} tabIndex={-1} data-testid="coaching-summary" aria-label={t("overview")}>
+                <div className="summary-kicker"><span className="eyebrow">{t("overview")}</span><span className={`pill ${coaching.status === "limited" ? "amber" : ""}`}>{t(coaching.status === "limited" ? "limited" : hasVisualReview ? "visualReview" : "movementSummary")}</span></div>
+                <h2>{cText(coaching.overall.headline)}</h2><p>{cText(coaching.overall.summary)}</p>{!hasVisualReview && <div className="review-upgrade-note">{t("upgradeReview")}</div>}
+                {coaching.strengths.length > 0 && <div className="strength-line"><span className="strength-check" aria-hidden="true">✓</span><div><strong>{t("strengths")} · {cText(coaching.strengths[0].title)}</strong><span>{cText(coaching.strengths[0].detail)}</span></div></div>}
+              </section>
+              <div className={`coaching-layout ${issues.length ? "" : "no-priorities"}`}>
+                <section className="priorities" aria-labelledby="priorities-heading"><div className="section-heading"><h2 id="priorities-heading">{t("priorities")}</h2>{issues.length > 0 && <span className="count">{String(issues.length).padStart(2, "0")}</span>}</div><p className="section-help">{t("priorityNote")}</p>
+                  {issues.length ? <ol className="issue-list">{issues.map((issue, i) => <li key={issue.id} className={`issue-card severity-${issue.severity}`} data-testid="issue-card">
+                    <div className="issue-heading"><span className="rank">{String(i + 1).padStart(2, "0")}</span><div><div className="issue-meta"><span className="priority-label">{t(issue.severity)}</span><span>{t("confidence")} · {t(`confidence_${issue.confidence}`)}</span></div><h3>{cText(issue.title)}</h3></div></div>
+                    <p className="issue-observation">{cText(issue.observation)}</p><div className="standard-gap"><span>{t("standardGap")}</span><p>{cText(issue.standard_gap)}</p></div>
+                    <p className="issue-action"><strong>{t("tryThis")}</strong>{cText(issue.action)}</p>
+                    <div className="issue-bottom">{evidenceButton(issue.evidence_frame_ids, cText(issue.title))}<details><summary>{t("detail")}</summary><div><h4>{t("why")}</h4><p>{cText(issue.why_it_matters)}</p><h4>{t("drill")}</h4><p>{cText(issue.drill)}</p></div></details></div>
+                  </li>)}</ol> : <div className="insufficient"><span className="evidence-icon" aria-hidden="true">◌</span><h3>{t("noIssues")}</h3><p>{t("noIssuesHelp")}</p><button className="text-button" onClick={() => evidenceSection.current?.scrollIntoView({ behavior: scrollBehavior() })}>{t("evidenceSection")} ↗</button></div>}
+                </section>
+                <aside className="practice-card" aria-labelledby="practice-heading"><span className="eyebrow">{t("nextPractice")}</span><span className="practice-mark" aria-hidden="true">↗</span><h2 id="practice-heading">{cText(coaching.next_practice.title)}</h2><p>{cText(coaching.next_practice.instruction)}</p><div className="success-check"><strong>{t("success")}</strong><p>{cText(coaching.next_practice.success_check)}</p></div></aside>
               </div>
-              <div className="viewers">
-                <div className="viewer-block">
-                  <div className="viewer-top">
-                    <strong>{chosen.label}</strong>
-                    <label className="check">
-                      <input
-                        type="checkbox"
-                        checked={showPose}
-                        onChange={(e) => setShowPose(e.target.checked)}
-                      />
-                      {t("pose")}
-                    </label>
-                  </div>
-                  <div
-                    className="viewer"
-                    style={{
-                      aspectRatio: `${ownCrop[2] - ownCrop[0]}/${ownCrop[3] - ownCrop[1]}`,
-                    }}
-                  >
-                    <video
-                      style={cropStyle(chosen, ownCrop)}
-                      ref={video}
-                      src={chosen.preview_url}
-                      className={!playing ? "hidden-video" : ""}
-                      playsInline
-                      preload="metadata"
-                      onEnded={() => setPlaying(false)}
-                      onTimeUpdate={(e) => {
-                        if (playing)
-                          setIndex(
-                            nearest(chosen, e.currentTarget.currentTime * 1e6),
-                          );
-                      }}
-                    />
-                    {!playing && (
-                      <img
-                        style={cropStyle(chosen, ownCrop)}
-                        src={`/api/assets/${chosen.id}/frames/${index}`}
-                        alt={`${chosen.label}, ${t("frame")} ${index}`}
-                      />
-                    )}
-                    <div
-                      className="overlay-space"
-                      style={cropStyle(chosen, ownCrop)}
-                    >
-                      <Pose frame={tracks[index]} show={showPose} />
-                    </div>
-                  </div>
-                  <div className="source-caption">
-                    <span>
-                      {t("source")}{" "}
-                      {(
-                        chosen.frame_index[index]?.source_time_us / 1e6
-                      ).toFixed(3)}
-                      s
-                    </span>
-                    <span>
-                      {t("frame")}{" "}
-                      {chosen.frame_index[index]?.source_frame_index ?? index}
-                    </span>
-                  </div>
-                </div>
-                <div className="viewer-block">
-                  <div className="viewer-top">
-                    <strong>{ref?.label || t("schematic")}</strong>
-                    <span className="muted">
-                      {ref && ownAnchor !== null && refAnchor !== null
-                        ? `${relative / 1e6 >= 0 ? "+" : ""}${(relative / 1e6).toFixed(2)}s`
-                        : ""}
-                    </span>
-                  </div>
-                  {ref ? (
-                    <>
-                      <div
-                        className="viewer"
-                        style={{
-                          aspectRatio: `${refCrop[2] - refCrop[0]}/${refCrop[3] - refCrop[1]}`,
-                        }}
-                      >
-                        <video
-                          style={cropStyle(ref, refCrop)}
-                          className="hidden-video"
-                          ref={refVideo}
-                          src={ref.preview_url}
-                          preload="metadata"
-                          playsInline
-                        />
-                        <img
-                          style={cropStyle(ref, refCrop)}
-                          src={`/api/assets/${ref.id}/frames/${refIndex}`}
-                          alt={`${ref.label}, ${t("frame")} ${refIndex}`}
-                        />
-                        <div
-                          className="overlay-space"
-                          style={cropStyle(ref, refCrop)}
-                        >
-                          <Pose frame={refTracks[refIndex]} show={showPose} />
-                        </div>
-                      </div>
-                      <div className="source-caption">
-                        <span>
-                          {t("source")}{" "}
-                          {(
-                            ref.frame_index[refIndex]?.source_time_us / 1e6
-                          ).toFixed(3)}
-                          s
-                        </span>
-                        <span>
-                          {t("frame")}{" "}
-                          {ref.frame_index[refIndex]?.source_frame_index ??
-                            refIndex}
-                        </span>
-                      </div>
-                    </>
-                  ) : (
-                    <Sketch t={t} />
-                  )}
-                </div>
+              {coaching.metrics.length > 0 && <section className="human-metrics" aria-labelledby="metrics-heading"><div className="section-heading"><h2 id="metrics-heading">{t("metrics")}</h2></div><p className="section-help">{t("metricsNote")}</p><div className="metric-grid">{coaching.metrics.map((metric) => <article className={`human-metric ${metric.status === "unavailable" ? "unavailable" : ""}`} key={metric.id} data-testid="coaching-metric"><h3>{cText(metric.label)}</h3><strong className="metric-value">{cText(metric.display_value) || t("unavailable")}</strong><p>{cText(metric.interpretation)}</p>{evidenceButton(metric.evidence_frame_ids, cText(metric.label))}</article>)}</div></section>}
+            </> : <section className="coaching-summary pending" data-testid="coaching-summary"><span className="eyebrow">{t("awaiting_analysis")}</span><h2>{t("reviewPending")}</h2><p>{ready ? t("legacyHelp") : t("reviewPendingHelp")}</p></section>}
+            {chosen.model_error && <p className="notice model-notice" role="status">{t(chosen.model_error)}</p>}
+            <section className="evidence-section" ref={evidenceSection} tabIndex={-1} data-testid="evidence-section" aria-labelledby="evidence-heading">
+              <div className="section-heading"><h2 id="evidence-heading">{t("evidenceSection")}</h2><button className="text-button back-review" onClick={() => { summarySection.current?.scrollIntoView({ behavior: scrollBehavior() }); summarySection.current?.focus({ preventScroll: true }); }}>{t("returnReview")} ↑</button></div>
+              <p className="section-help">{t("evidenceNote")}</p>
+              {evidenceLabel && <p className="evidence-context" role="status">{t("selectedEvidence")} · <strong>{evidenceLabel}</strong></p>}
+              <div className={`video-layout ${ref ? "has-reference" : ""}`}>
+                <div className="video-main"><div className="viewer-top"><strong>{chosen.label}</strong><span>{t("currentShot")}</span></div><div className="viewer" style={{ aspectRatio: `${ownCrop[2] - ownCrop[0]}/${ownCrop[3] - ownCrop[1]}`, maxWidth: `${440 * (ownCrop[2] - ownCrop[0]) / (ownCrop[3] - ownCrop[1])}px`, marginInline: "auto" }}>
+                  <video style={cropStyle(chosen, ownCrop)} ref={video} src={chosen.preview_url} className={!playing ? "hidden-video" : ""} playsInline preload="metadata" onLoadedMetadata={(e) => { e.currentTarget.playbackRate = Number(speed); }} onEnded={() => setPlaying(false)} onTimeUpdate={(e) => { if (playing) setIndex(nearest(chosen, e.currentTarget.currentTime * 1e6)); }} />
+                  {!playing && <img style={cropStyle(chosen, ownCrop)} src={`/api/assets/${chosen.id}/frames/${index}`} alt={`${chosen.label}, ${t("frame")} ${index}`} />}
+                  <div className="overlay-space" style={cropStyle(chosen, ownCrop)}><Pose frame={tracks[index]} show={showPose} /></div>
+                </div><div className="source-caption"><span>{t("source")} {((chosen.frame_index[index]?.source_time_us || 0) / 1e6).toFixed(3)}s</span><span>{t("frame")} {chosen.frame_index[index]?.source_frame_index ?? index}</span></div></div>
+                {ref ? <div className="video-reference"><div className="viewer-top"><strong>{ref.label}</strong><span>{relative >= 0 ? "+" : ""}{(relative / 1e6).toFixed(2)}s</span></div><div className="viewer" style={{ aspectRatio: `${refCrop[2] - refCrop[0]}/${refCrop[3] - refCrop[1]}`, maxWidth: `${440 * (refCrop[2] - refCrop[0]) / (refCrop[3] - refCrop[1])}px`, marginInline: "auto" }}><img style={cropStyle(ref, refCrop)} src={`/api/assets/${ref.id}/frames/${refIndex}`} alt={`${ref.label}, ${t("frame")} ${refIndex}`} /><div className="overlay-space" style={cropStyle(ref, refCrop)}><Pose frame={refTracks[refIndex]} show={showPose} /></div></div><div className="source-caption"><span>{t("source")} {((ref.frame_index[refIndex]?.source_time_us || 0) / 1e6).toFixed(3)}s</span><span>{t("frame")} {ref.frame_index[refIndex]?.source_frame_index ?? refIndex}</span></div><p className="alignment-note">{t(ownAnchor !== null && refAnchor !== null ? "matchingRelease" : "approximateAlignment")}</p></div> : <div className="video-guide"><span className="eyebrow">{t("details")}</span><h3>{t("focus")}</h3><p>{t("evidenceNote")}</p><div className="video-options"><label className="check"><input type="checkbox" checked={focused} onChange={(e) => setFocused(e.target.checked)} />{t("focus")}</label><label className="check"><input type="checkbox" checked={showPose} onChange={(e) => setShowPose(e.target.checked)} />{t("pose")}</label></div>{chosen.phases.release && <button onClick={() => seek(chosen.phases.release!.frame_range[0])}>{t("releaseJump")} ↗</button>}</div>}
               </div>
-              <div className="transport">
-                <button
-                  onClick={() => {
-                    if (playing) {
-                      video.current?.pause();
-                      setPlaying(false);
-                    } else {
-                      setPlaying(true);
-                      void video.current?.play().catch(() => setPlaying(false));
-                    }
-                  }}
-                >
-                  {t(playing ? "pause" : "play")}
-                </button>
-                <button aria-label={t("prev")} onClick={() => seek(index - 1)}>
-                  ‹
-                </button>
-                <input
-                  aria-label={t("frame")}
-                  type="range"
-                  min="0"
-                  max={chosen.frame_index.length - 1}
-                  value={index}
-                  onChange={(e) => seek(Number(e.target.value))}
-                />
-                <button aria-label={t("next")} onClick={() => seek(index + 1)}>
-                  ›
-                </button>
-                <span>
-                  {(chosen.frame_index[index]?.time_us / 1e6).toFixed(2)}s
-                </span>
-              </div>
-              <div className="phase-panel">
-                <div className="section-title">
-                  <h2>{t("release")}</h2>
-                  <span
-                    className={`pill ${chosen.phases.release?.source === "user_corrected" ? "" : "amber"}`}
-                  >
-                    {t(
-                      chosen.phases.release?.source === "user_corrected"
-                        ? "reviewed"
-                        : "candidate",
-                    )}
-                  </span>
-                </div>
-                {chosen.phases.release ? (
-                  <p className="interval">
-                    {chosen.phases.release.range_us
-                      .map((v) => (v / 1e6).toFixed(3))
-                      .join(" – ")}
-                    s <span className="muted">{t("clip")}</span>
-                    <button
-                      className="text-button"
-                      onClick={() =>
-                        seek(chosen.phases.release!.frame_range[0])
-                      }
-                    >
-                      {t("evidence")} ↗
-                    </button>
-                  </p>
-                ) : (
-                  <p className="muted">
-                    {ready ? t("notKnown") : t("noMetrics")}
-                  </p>
-                )}
-                {ready && (
-                  <>
-                    <p className="muted">{t("phaseHelp")}</p>
-                    <div className="phase-actions">
-                      <button
-                        className={last !== null ? "chosen" : ""}
-                        onClick={() => {
-                          setLast(index);
-                          setPlaying(false);
-                          video.current?.pause();
-                        }}
-                      >
-                        {t("last")}
-                        {last !== null ? ` · ${last}` : ""}
-                      </button>
-                      <button
-                        className={first !== null ? "chosen" : ""}
-                        onClick={() => {
-                          setFirst(index);
-                          setPlaying(false);
-                          video.current?.pause();
-                        }}
-                      >
-                        {t("first")}
-                        {first !== null ? ` · ${first}` : ""}
-                      </button>
-                      <button
-                        className="primary"
-                        disabled={!validSave || generating}
-                        onClick={() => void action(save)}
-                      >
-                        {t("save")}
-                      </button>
-                      {(last !== null || first !== null) && (
-                        <button
-                          className="text-button"
-                          onClick={() => {
-                            setLast(null);
-                            setFirst(null);
-                          }}
-                        >
-                          {t("reset")}
-                        </button>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-              {ready && (
-                <Curve asset={chosen} current={index} onSeek={seek} t={t} />
-              )}
-              <div className="comparison-controls">
-                <label>
-                  {t("comparator")}
-                  <select
-                    value={reference}
-                    onChange={(e) => setReference(e.target.value)}
-                  >
-                    <option value="">{t("noReference")}</option>
-                    {assets
-                      .filter((a) => a.id !== selected)
-                      .map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.label}
-                          {!a.measurements ? " · " + t("ready") : ""}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                {reference && (
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={sameView}
-                      onChange={(e) => setSameView(e.target.checked)}
-                    />
-                    {t("sameView")}
-                  </label>
-                )}
-                <button
-                  disabled={
-                    !ready || generating || !!(ref && !ref.measurements)
-                  }
-                  onClick={() =>
-                    void action(async () => {
-                      await api(
-                        `/assets/${selected}/reports`,
-                        post({
-                          expected_revision: chosen.revision,
-                          reference_asset_id: reference || null,
-                          locale: lang,
-                          assume_same_view: sameView,
-                        }),
-                      );
-                    })
-                  }
-                >
-                  {t("report")}
-                </button>
-                {ref && !ref.measurements && (
-                  <p className="notice">{t("reference_unanalyzed")}</p>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="empty">
-              <span className="mark">↗</span>
-              <h1>{t("title")}</h1>
-              <p>{t("empty")}</p>
-            </div>
-          )}
-        </section>
-        <aside className="insights">
-          <span className="eyebrow">{t("projection")}</span>
-          <h2>{t("metrics")}</h2>
-          {ready && chosen ? (
-            <>
-              <p className="muted">
-                {t("visibility")} {chosen.measurements!.visible_frames}/
-                {chosen.measurements!.total_frames}
-              </p>
-              <div className="metric-list">
-                {chosen.measurements!.measurements.map((m) => (
-                  <div key={m.key}>
-                    <span>{t(m.key)}</span>
-                    <strong>
-                      {m.value === null
-                        ? "—"
-                        : m.value.toFixed(
-                            m.unit === "milliseconds" ? 0 : 2,
-                          )}{" "}
-                      <small>{t(m.unit)}</small>
-                    </strong>
-                    {m.reason && <p>{t(m.reason)}</p>}
-                    <button
-                      className="text-button"
-                      disabled={!m.evidence_frame_ids.length}
-                      onClick={() => {
-                        const n = chosen.frame_index.findIndex(
-                          (f) => f.frame_id === m.evidence_frame_ids[0],
-                        );
-                        if (n >= 0) seek(n);
-                      }}
-                    >
-                      {t("evidence")} ↗
-                    </button>
-                  </div>
-                ))}
-              </div>
-              {chosen.measurements!.flags.length > 0 && (
-                <div className="quality">
-                  {chosen.measurements!.flags.map((f) => (
-                    <p key={f}>{t(f)}</p>
-                  ))}
-                </div>
-              )}
-              {report?.comparison.differences.length ? (
-                <div className="difference">
-                  <h3>{t("comparator")}</h3>
-                  {report.comparison.differences.map((d) => (
-                    <p key={d.key}>
-                      {t(d.key)}{" "}
-                      <strong>
-                        {d.difference >= 0 ? "+" : ""}
-                        {d.difference.toFixed(2)}
-                      </strong>{" "}
-                      {t(d.unit)}
-                    </p>
-                  ))}
-                </div>
-              ) : (
-                report && <p className="muted">{t(report.comparison.reason)}</p>
-              )}
-              {chosen.model_assist && (
-                <div className="model-observations">
-                  <h3>
-                    {t("modelReview")} ·{" "}
-                    {t(chosen.analysis_config?.mode || "unknown")}
-                  </h3>
-                  {chosen.model_assist.observations.map((o, i) => (
-                    <div key={i}>
-                      <p>
-                        {t(
-                          o.attribute === "visibility"
-                            ? "model_visibility"
-                            : o.attribute,
-                        )}{" "}
-                        · {t(o.interpretation)}
-                      </p>
-                      <button
-                        className="text-button"
-                        onClick={() => {
-                          const frame = chosen.frame_index.findIndex(
-                            (f) => f.frame_id === o.evidence_frame_ids[0],
-                          );
-                          if (frame >= 0) seek(frame);
-                        }}
-                      >
-                        {t("evidence")} ↗
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="cue">
-                <span className="eyebrow">{t("cue")}</span>
-                <p>
-                  {report?.findings[0]
-                    ? t(report.findings[0].cue_id)
-                    : t("noFindings")}
-                </p>
-                <small>{t("hypothesis")}</small>
-              </div>
-              <p className="limits">{t("limits")}</p>
-              {chosen.model_error && (
-                <p className="notice">{t(chosen.model_error)}</p>
-              )}
-              {report && (
-                <>
-                  <h3>{t("exports")}</h3>
-                  <p className="muted">
-                    {t("reportLanguage")}:{" "}
-                    {report.locale === "zh" ? "中文" : "English"}
-                  </p>
-                  <div className="exports">
-                    {["text", "image", "video", "json"].map((k) => (
-                      <a
-                        key={k}
-                        href={`/api/reports/${report.id}/${k}`}
-                        download
-                      >
-                        {t(k)} <span>↓</span>
-                      </a>
-                    ))}
-                  </div>
-                  <div className="sources">
-                    <h3>{t("refs")}</h3>
-                    {report.sources.map((s) => (
-                      <a
-                        key={s.id}
-                        href={s.url}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        {s.title || s.id} ↗
-                      </a>
-                    ))}
-                  </div>
-                </>
-              )}
-            </>
-          ) : (
-            <p className="muted">{t("noMetrics")}</p>
-          )}
-          <div className="activity">
-            <h3>{t("jobs")}</h3>
-            {jobs.slice(0, 4).map((j) => (
-              <div className="job" key={j.id}>
-                <strong>{t(j.status)}</strong>
-                <span>{t(j.stage)}</span>
-                {j.status === "running" &&
-                  j.stage === "pose_and_ball" &&
-                  j.progress.total_frames && (
-                    <progress
-                      value={j.progress.frames || 0}
-                      max={j.progress.total_frames}
-                    />
-                  )}
-                <small>
-                  {j.completed ?? 0}
-                  {j.total ? ` / ${j.total}` : ""}
-                </small>
-                {["running", "queued"].includes(j.status) && (
-                  <button
-                    onClick={() =>
-                      void action(async () => {
-                        await api(`/jobs/${j.id}/cancel`, post({}));
-                      })
-                    }
-                  >
-                    {t("cancel")}
-                  </button>
-                )}
-                {j.error_code && <p className="notice">{t(j.error_code)}</p>}
-                {j.errors.map((e, i) => (
-                  <p className="notice" key={i}>
-                    {t(e.code)}
-                  </p>
-                ))}
-                {j.receipts.length > 0 ? (
-                  <p className="cost">
-                    {t("usage")}: {j.receipts.length}
-                    <br />
-                    {j.receipts.every(
-                      (r) => r.cost.status === "subscription_usage",
-                    )
-                      ? t("codexPlan")
-                      : j.receipts.some((r) => r.cost.estimated_usd === null)
-                        ? t("unknownCost")
-                        : `${t("estimated")} $${j.receipts.reduce((s, r) => s + (r.cost.estimated_usd || 0), 0).toFixed(5)}`}
-                    <small>
-                      {t(
-                        j.receipts.every(
-                          (r) => r.cost.status === "subscription_usage",
-                        )
-                          ? "codexHint"
-                          : "costScope",
-                      )}
-                    </small>
-                  </p>
-                ) : (
-                  <p className="cost">{t("localCost")}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </aside>
+              <div className="transport"><button aria-label={t(playing ? "pause" : "play")} onClick={() => { if (playing) { video.current?.pause(); setPlaying(false); } else { if (video.current && video.current.ended) video.current.currentTime = 0; setPlaying(true); void video.current?.play().catch(() => setPlaying(false)); } }}>{playing ? "Ⅱ" : "▶"}<span>{t(playing ? "pause" : "play")}</span></button><input aria-label={t("timeline")} type="range" min="0" max={Math.max(0, chosen.frame_index.length - 1)} value={index} onChange={(e) => seek(Number(e.target.value))} /><span className="clip-time">{((chosen.frame_index[index]?.time_us || 0) / 1e6).toFixed(2)} / {(chosen.duration_us / 1e6).toFixed(1)}s</span><select aria-label={t("slow")} value={speed} onChange={(e) => setSpeed(e.target.value)}>{["0.25", "0.5", "1"].map((v) => <option key={v} value={v}>{v}×</option>)}</select></div>
+              {ref && <div className="video-options inline"><label className="check"><input type="checkbox" checked={focused} onChange={(e) => setFocused(e.target.checked)} />{t("focus")}</label><label className="check"><input type="checkbox" checked={showPose} onChange={(e) => setShowPose(e.target.checked)} />{t("pose")}</label></div>}
+              <details className="disclosure frame-tools"><summary>{t("reviewTools")}</summary><div className="disclosure-body"><div className="step-buttons"><button onClick={() => seek(index - 1)} disabled={index === 0}>← {t("prev")}</button><button onClick={() => seek(index + 1)} disabled={index >= chosen.frame_index.length - 1}>{t("next")} →</button><span>{t("frame")} {index}</span></div><h3>{t("release")}</h3>{chosen.phases.release ? <p className="interval">{chosen.phases.release.range_us.map((v) => (v / 1e6).toFixed(3)).join(" – ")}s <span className="pill">{t(["manual", "user_corrected"].includes(chosen.phases.release.source) ? "reviewedInterval" : "candidate")}</span></p> : <p className="muted">{ready ? t("notKnown") : t("noMetrics")}</p>}{ready && <><p className="muted">{t("phaseHelp")}</p><div className="phase-actions"><button className={last !== null ? "chosen" : ""} onClick={() => { setLast(index); seek(index); }}>{t("last")}{last !== null ? ` · ${last}` : ""}</button><button className={first !== null ? "chosen" : ""} onClick={() => { setFirst(index); seek(index); }}>{t("first")}{first !== null ? ` · ${first}` : ""}</button><button className="primary" disabled={!validSave || generating} onClick={() => void action(save)}>{t("save")}</button>{(last !== null || first !== null) && <button onClick={() => { setLast(null); setFirst(null); }}>{t("reset")}</button>}</div></>}</div></details>
+              <details className="disclosure comparison-disclosure"><summary>{t("comparator")}<span>{ref?.label || t("noReference")}</span></summary><div className="disclosure-body"><p className="muted">{t("comparisonNote")}</p><div className="comparison-controls"><label>{t("comparator")}<select value={reference} onChange={(e) => setReference(e.target.value)}><option value="">{t("noReference")}</option>{assets.filter((a) => a.id !== selected).map((a) => <option key={a.id} value={a.id}>{a.label}{!a.measurements ? ` · ${t("ready")}` : ""}</option>)}</select></label>{reference && <label className="check"><input type="checkbox" checked={sameView} onChange={(e) => setSameView(e.target.checked)} />{t("sameView")}</label>}<button className="primary" disabled={!ready || generating || !!(ref && !ref.measurements)} onClick={() => void action(updateReport)}>{t("compare")}</button></div>{ref && !ref.measurements && <p className="notice">{t("reference_unanalyzed")}</p>}{!reportMatches && report && <p className="notice" data-testid="comparison-stale">{t("comparisonDraft")}</p>}{reportMatches && reference && <div className="comparison-result"><h3>{t("comparisonLabel")} · {ref?.label}</h3>{report.comparison.differences.length ? <dl>{report.comparison.differences.map((d) => <div key={d.key}><dt>{t(d.key)}</dt><dd>{d.difference >= 0 ? "+" : ""}{d.difference.toFixed(d.unit === "milliseconds" ? 0 : 2)} {t(d.unit)}</dd></div>)}</dl> : <p className="muted">{t(report.comparison.reason)}</p>}</div>}</div></details>
+            </section>
+            <section className="secondary-details" aria-label={t("details")}>
+              {ready && <details className="disclosure"><summary>{t("raw")}</summary><div className="disclosure-body"><p className="muted">{t("rawHelp")} {t("visibility")} {chosen.measurements!.visible_frames}/{chosen.measurements!.total_frames}</p><div className="raw-metrics">{chosen.measurements!.measurements.map((m) => <div key={m.key}><span>{t(m.key)}</span><strong>{m.value === null ? "—" : m.value.toFixed(m.unit === "milliseconds" ? 0 : 2)} <small>{t(m.unit)}</small></strong>{m.reason && <p>{t(m.reason)}</p>}{evidenceButton(m.evidence_frame_ids, t(m.key))}</div>)}</div><Curve asset={chosen} current={index} onSeek={seek} t={t} />{chosen.measurements!.flags.length > 0 && <ul className="limits-list">{chosen.measurements!.flags.map((f) => <li key={f}>{t(f)}</li>)}</ul>}{chosen.model_assist && <div className="model-observations"><h3>{t("modelReview")} · {t(chosen.analysis_config?.mode || "unknown")}</h3>{chosen.model_assist.observations.map((o, i) => <div key={i}><p>{t(o.attribute === "visibility" ? "model_visibility" : o.attribute)} · {t(o.interpretation)}</p>{evidenceButton(o.evidence_frame_ids, t(o.attribute))}</div>)}</div>}</div></details>}
+              <details className="disclosure"><summary>{t("sourceDetail")}</summary><div className="disclosure-body"><p className="muted">{t("limits")}</p>{coaching?.limitations.length ? <ul className="limits-list">{coaching.limitations.map((l, i) => <li key={i}>{cText(l)}</li>)}</ul> : null}<div className="sources">{report?.sources.map((s) => <a key={s.id} href={s.url} target="_blank" rel="noreferrer">{s.title || s.id} ↗</a>)}</div></div></details>
+              <details className="disclosure downloads"><summary>{t("downloads")}</summary><div className="disclosure-body">{exportMatches ? <><p className="muted">{chosen.label} · {t("revision")} {chosen.revision} · {t("exportsLanguage")}: {report.locale === "zh" ? "中文" : "English"}{ref ? ` · ${t("referenceUsed")}: ${ref.label}` : ""}</p><div className="exports">{["text", "image", "video", "json"].map((kind) => <a key={kind} href={`/api/reports/${report.id}/${kind}`} download>{t(kind)} <span aria-hidden="true">↓</span></a>)}</div></> : <><p className="muted">{t("exportPending")}</p><button disabled={!ready || generating || !!(ref && !ref.measurements)} onClick={() => void action(updateReport)}>{t("refreshExports")}</button></>}</div></details>
+            </section>
+          </> : <div className="empty"><span className="mark" aria-hidden="true">↗</span><h1>{t("noShots")}</h1><p>{t("emptyHelp")}</p><div className="empty-method">{methodSelect}{mode !== "local" && <p className="mode-note">{t(modeReady ? mode === "astra_codex" ? "codexHint" : "apiHint" : modeProblem)}</p>}</div><button className="primary" disabled={!canStart} onClick={() => upload.current?.click()}>＋ {t("import")}</button></div>}
+          {jobs.length > 0 && <details className="disclosure activity"><summary>{t("jobs")}{active && <span role="status">{t("analyzingOther")}</span>}</summary><div className="disclosure-body">{jobs.slice(0, 4).map((j) => <div className="job" key={j.id}><div className="job-heading"><strong>{t(j.status)}</strong><span>{t(j.stage)}</span><small>{j.completed ?? 0}{j.total ? ` / ${j.total}` : ""}</small></div>{j.status === "running" && j.stage === "pose_and_ball" && j.progress.total_frames && <progress aria-label={t(j.stage)} value={j.progress.frames || 0} max={j.progress.total_frames} />}{["running", "queued"].includes(j.status) && <button onClick={() => void action(async () => { await api(`/jobs/${j.id}/cancel`, post({})); })}>{t("cancel")}</button>}{j.error_code && <p className="notice">{t(j.error_code)}</p>}{j.errors.map((e, i) => <p className="notice" key={i}>{t(e.code)}</p>)}{j.receipts.length > 0 ? <p className="cost">{t("usage")}: {j.receipts.length} · {j.receipts.every((r) => r.cost.status === "subscription_usage") ? t("codexPlan") : j.receipts.some((r) => r.cost.estimated_usd === null) ? t("unknownCost") : `${t("estimated")} $${j.receipts.reduce((s, r) => s + (r.cost.estimated_usd || 0), 0).toFixed(5)}`}<small>{t(j.receipts.every((r) => r.cost.status === "subscription_usage") ? "codexHint" : "costScope")}</small></p> : <p className="cost">{t("localCost")}</p>}</div>)}</div></details>}
+        </div>
       </main>
-      <footer>
-        {t("sourceMap")} <span>Shot Form Coach · V1</span>
-      </footer>
+      <footer><span>{t("sourceMap")}</span><span>Shot Form Coach</span></footer>
     </>
   );
 }

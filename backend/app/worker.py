@@ -8,6 +8,7 @@ from .db import now
 from .perception import analyze as extract_tracks
 from .provider import assist
 from .reports import build_report
+from .review_data import current_measurements
 
 
 class Worker:
@@ -42,11 +43,14 @@ class Worker:
         return json.loads(self.settings.resolve(asset["tracks_path"]).read_text())
 
     def render(self, job_id, asset, request):
+        asset = current_measurements(self.settings, asset)
         reference = (
             self.repo.get("asset", request["reference_asset_id"])
             if request.get("reference_asset_id")
             else None
         )
+        if reference:
+            reference = current_measurements(self.settings, reference)
         if reference and not reference.get("measurements"):
             raise ValueError("reference_unanalyzed")
         if reference and reference["id"] == asset["id"]:
@@ -118,7 +122,12 @@ class Worker:
                                     self.settings,
                                     self.repo,
                                     key,
-                                    {**asset, "phases": phases},
+                                    {
+                                        **asset,
+                                        "phases": phases,
+                                        "analysis_config": config,
+                                        "measurements": measure(track, phases, side, origin),
+                                    },
                                     config,
                                     lambda: self.cancelled(key),
                                 )

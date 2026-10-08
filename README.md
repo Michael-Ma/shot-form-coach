@@ -40,6 +40,26 @@ To import existing Workbench clips, set `SFC_WORKBENCH_DATA` in `.env` to the ab
 of that project's `.data` directory. Otherwise upload a video of one shot, at most 30 seconds.
 Clips are copied into this project's data directory, with their original frame timestamps.
 
+## A review you can use at your next practice
+
+The main screen starts with an overall takeaway, up to three ranked practice priorities,
+a next-set plan, and four understandable movement metrics. Each issue connects what is visible
+to a sourced teaching goal, a suggested change, a drill, and the original video evidence.
+Priority and evidence confidence are separate; missing evidence does not become a fault or a score.
+
+The main metrics are dip-to-release time, hand position around release, observed raised-hand
+finish duration, and post-release hand movement. Technical measurements, phase correction,
+comparators, sources, exports and activity/costs remain available in expandable details.
+
+Local vision produces a clearly labelled **movement summary**. Gemini/Astra can additionally
+produce a bilingual **visual coaching review** using the supplied teaching rubric, measured
+context and input frames. The method selector sits beside the analysis button; the app remembers
+an explicit choice but never starts a remote request simply because a selection or page changes.
+
+Current automatic priorities remain provisional. The system does not force three problems,
+assign a universal form score, claim measured Curry motion or diagnose the cause of a miss.
+The teaching goals are server-controlled; the model cannot silently redefine the standard.
+
 ## Try the workflow
 
 1. Import a clip or a Workbench run. Import automatically queues analysis using the selected
@@ -60,9 +80,9 @@ The interface supports English and Chinese. A release correction rebuilds export
 current interface language; switching language alone preserves the existing exported report
 until **Update comparison & exports** is selected.
 
-The first measurable loop concerns follow-through and personal repeatability: projected
-wrist height in two post-release windows, its change, projected elbow-angle change, and
-loading-to-release timing. Missing body points or later context produce unavailable values,
+The first measurable loop concerns release rhythm and the visible finish. Detailed views
+retain projected wrist and elbow measurements; the main view translates them into movement
+terms and explains the limits of each observation. Missing body points or later context produce unavailable values,
 not zero. The UI gives one practice hypothesis to test in a matched retake.
 
 ## Choose Gemini or Astra

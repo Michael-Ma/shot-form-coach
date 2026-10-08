@@ -17,3 +17,6 @@ dist/
 
 .playwright-cli/
 vendor-notes/
+
+output/
+web/vite.qa.config.ts
