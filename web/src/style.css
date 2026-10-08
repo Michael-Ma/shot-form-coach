@@ -894,3 +894,13 @@ footer {
   gap: 8px;
   justify-items: end;
 }
+
+.model-observations {
+  margin-top: 20px;
+  border-top: 1px solid var(--line);
+  padding-top: 15px;
+  font-size: 12px;
+}
+.model-observations p {
+  margin: 7px 0;
+}

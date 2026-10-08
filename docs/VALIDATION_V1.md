@@ -55,9 +55,10 @@ committed visual-design example is separately described in `VALIDATION.md`.
 
 ## Limits and subsequent validation
 
-The Gemini adapter was tested with controlled responses, including invalid evidence, timeout
-and late cancellation; no live paid Gemini request was made. Its V1 transport is ordered JPEG
-frames, not native video. Astra and Qwen are not integrated. No cross-model ranking is claimed.
+The direct Gemini and Astra API adapters were tested with controlled responses, including
+invalid evidence, timeout and late cancellation. No live direct-API request was made in these
+checks. Transport is ordered JPEG frames, not native video. Astra additionally supports the
+Codex transport validated below; Qwen remains unintegrated. No cross-model ranking is claimed.
 
 The default body selector is a largest/continuous visible-person heuristic, not a trained
 identity tracker. There is no shooting-specific ground truth, calibrated 3D analysis, universal
@@ -66,3 +67,28 @@ correction covers the release interval; other phase edits and stability attribut
 
 M6 needs 30–50 independently labelled clips from multiple sessions/views. M7 needs matched
 practice, no-cue and cross-day retests. Those dependencies are separate from this runnable V1.
+
+## Provider and startup update (V0.3)
+
+21 backend tests pass after adding provider-specific receipts and billing, missing-key rejection,
+Codex command/environment boundaries, real subprocess JSONL parsing, and child cancellation
+with received usage retained. The production frontend build passes. The model selector exposes
+Gemini, Astra (Codex), Astra (API), and local vision in both languages; a 390px browser check
+shows no horizontal overflow.
+
+The `start.sh` launcher installs/checks dependencies, creates a missing local environment file,
+checksums the models, reports model/auth readiness, waits for both services and can open the
+browser. `start.command` supplies a macOS double-click entry. `--check`, `--no-open` and repeat
+startup were exercised. Existing local Gemini configuration was reused in the ignored `.env`;
+credentials and runtime files were checked to remain outside Git.
+
+One **live Codex/Astra call on eight newly generated synthetic stick-figure images** completed
+successfully through ChatGPT auth: 16,319 input tokens and 154 output tokens were recorded.
+The returned phase interval and observation frame IDs passed the same validation as other
+providers. The process emitted one completed turn, with no tool calls. This verifies transport,
+structured response and usage capture; it is not evidence of shooting-analysis accuracy.
+
+A proposed live test on the user's private shooting clip was rejected by automatic approval
+review because specific authorization to transmit that video to OpenAI was absent. No such
+request was submitted. Private-clip validation remains pending explicit user authorization.
+Direct Astra API and Gemini calls use controlled-response boundary tests in this update.

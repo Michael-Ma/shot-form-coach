@@ -32,6 +32,20 @@ def pricing_snapshot(provider: str, model_id: str, submitted_on: date) -> dict:
                 "output_including_thinking": 7.5 if future else 3.75,
             }
             snapshot["effective_from"] = "2027-01-01" if future else "2026-10-05"
+    elif provider == "openai" and model_id == "gpt-6-astra":
+        snapshot.update(
+            pricing_source="https://developers.openai.com/api/docs/models/gpt-6-astra",
+            pricing_version="openai-standard-2026-10-08",
+            long_context_threshold=272000,
+            rates_per_million_tokens={"input": 10, "cached_input": 1, "output_including_thinking": 50},
+            basis="standard_token_estimate_excludes_unreported_cache_write_charges",
+        )
+    elif provider == "codex":
+        snapshot.update(
+            basis="chatgpt_subscription_usage",
+            pricing_version=None,
+            pricing_source="https://learn.chatgpt.com/docs/auth",
+        )
     return snapshot
 
 
@@ -54,8 +68,22 @@ def estimate_call_cost(snapshot: dict, usage: dict, *, outcome_unknown: bool = F
             "cached_input_usd": 0.0,
             "output_usd": 0.0,
         }
+    if snapshot["provider"] == "codex" and not outcome_unknown:
+        return {
+            **result,
+            "status": "subscription_usage",
+            "reason": "charged_to_codex_plan",
+            "token_counts": usage if usage else None,
+        }
     if outcome_unknown:
         return {**result, "reason": "request_outcome_unknown"}
+    if snapshot["provider"] == "openai":
+        details = usage.get("input_tokens_details") or {}
+        usage = {
+            "prompt_token_count": usage.get("input_tokens"),
+            "cached_content_token_count": details.get("cached_tokens", 0),
+            "candidates_token_count": usage.get("output_tokens"),
+        }
     rates = snapshot.get("rates_per_million_tokens")
     if rates is None:
         return {**result, "reason": "model_pricing_unavailable"}
@@ -76,6 +104,16 @@ def estimate_call_cost(snapshot: dict, usage: dict, *, outcome_unknown: bool = F
     if counts["tool_use_prompt_token_count"]:
         # The current adapter enables no tools. Do not silently omit future tool fees.
         return {**result, "reason": "tool_usage_pricing_unavailable"}
+    if (
+        snapshot.get("long_context_threshold")
+        and counts["prompt_token_count"] > snapshot["long_context_threshold"]
+    ):
+        rates = {
+            **rates,
+            "input": rates["input"] * 2,
+            "cached_input": rates["cached_input"] * 2,
+            "output_including_thinking": rates["output_including_thinking"] * 1.5,
+        }
     uncached = counts["prompt_token_count"] - counts["cached_content_token_count"]
     generated = counts["candidates_token_count"] + counts["thoughts_token_count"]
     million = Decimal(1_000_000)

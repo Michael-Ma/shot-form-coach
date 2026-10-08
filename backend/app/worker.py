@@ -112,7 +112,7 @@ class Worker:
                         local_phases = dict(phases)
                         model = None
                         model_error = None
-                        if config["mode"] == "gemini":
+                        if config["mode"] != "local":
                             try:
                                 model = assist(
                                     self.settings,

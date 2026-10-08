@@ -5,7 +5,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from .astra_api import call_astra_api
 from .billing import estimate_call_cost, pricing_snapshot
+from .codex_runner import CodexCallInterrupted, call_codex, codex_status
 from .db import ident, now
 
 
@@ -45,6 +47,25 @@ def sampled_frames(asset, maximum):
     return [frames[i] for i in sorted(indices)]
 
 
+INSTRUCTION = (
+    "Use only supplied FRAME identifiers. Describe visible projection only. "
+    "Find the last visible ball-hand contact and first definite separation, or use null for both. "
+    "Do not invent biomechanical numbers or infer why a shot missed. "
+    "Observations must cite input frames. Limit observations to three."
+)
+
+
+def ensure_ready(settings, mode):
+    if mode == "gemini" and not settings.api_key:
+        raise ValueError("api_key_missing")
+    if mode == "astra_api" and not settings.openai_api_key:
+        raise ValueError("openai_key_missing")
+    if mode == "astra_codex":
+        status = codex_status(settings.codex_bin)
+        if not status["ready"]:
+            raise ValueError(status["reason"])
+
+
 def call_sdk(settings, frames, config):
     from google import genai
     from google.genai import types
@@ -68,10 +89,7 @@ def call_sdk(settings, frames, config):
             model=settings.model_id,
             contents=parts,
             config=types.GenerateContentConfig(
-                system_instruction="Use only supplied FRAME identifiers. Describe visible projection only. "
-                "Find the last visible ball-hand contact and first definite separation, or use null for both. "
-                "Do not invent biomechanical numbers or infer why a shot missed. "
-                "Observations must cite input frames. Limit observations to three.",
+                system_instruction=INSTRUCTION,
                 response_mime_type="application/json",
                 response_schema=ModelReply,
                 max_output_tokens=16000,
@@ -97,14 +115,18 @@ def call_sdk(settings, frames, config):
 
 
 def assist(settings, repo, job_id, asset, config, cancelled, transport=None):
-    if not settings.api_key:
-        raise ValueError("api_key_missing")
+    mode = config.get("mode", "gemini")
+    ensure_ready(settings, mode)
+    provider = {"gemini": "gemini", "astra_api": "openai", "astra_codex": "codex"}[mode]
+    model = settings.model_id if mode == "gemini" else settings.astra_model
     job = repo.get("job", job_id)
     if len(job["receipts"]) >= config["max_model_calls"]:
         raise ValueError("model_call_budget_exhausted")
     for previous in repo.all("job"):
         if any(
-            r.get("asset_id") == asset["id"] and r["status"] in ("submitting", "request_unknown")
+            r.get("asset_id") == asset["id"]
+            and r.get("provider", "gemini") == provider
+            and r["status"] in ("submitting", "request_unknown")
             for r in previous.get("receipts", [])
         ):
             raise ValueError("unresolved_request_blocks_resubmission")
@@ -117,19 +139,56 @@ def assist(settings, repo, job_id, asset, config, cancelled, transport=None):
         "asset_revision": asset["revision"],
         "status": "submitting",
         "submitted_at": now(),
-        "model": settings.model_id,
+        "model": model,
+        "provider": provider,
+        "analysis_mode": mode,
         "input_frame_ids": [f["frame_id"] for f in frames],
-        "transport": "ordered_jpeg_frames",
+        "transport": "codex_exec_images" if mode == "astra_codex" else "ordered_jpeg_frames",
         "timeout_s": config["request_timeout_s"],
-        "max_output_tokens": 16000,
+        "max_output_tokens": None if mode == "astra_codex" else 16000,
         "retry_attempts": 1,
         "cost": {"status": "pending", "estimated_usd": None},
     }
     receipts = job["receipts"] + [receipt]
     repo.patch("job", job_id, receipts=receipts, stage="model_assist")
-    snapshot = pricing_snapshot("gemini", settings.model_id, date.today())
+    snapshot = pricing_snapshot(provider, model, date.today())
+
+    def progress(response):
+        receipt.update(
+            response=response,
+            cost=estimate_call_cost(snapshot, response.get("usage", {})),
+            status="received" if response.get("turn_completed") else "submitting",
+        )
+        repo.patch("job", job_id, receipts=receipts)
+
     try:
-        response = (transport or call_sdk)(settings, frames, config)
+        if transport:
+            response = transport(settings, frames, config)
+        elif mode == "gemini":
+            response = call_sdk(settings, frames, config)
+        elif mode == "astra_api":
+            response = call_astra_api(settings, frames, config, ModelReply.model_json_schema(), INSTRUCTION)
+        else:
+            response = call_codex(
+                settings,
+                frames,
+                config,
+                {"id": receipt["id"], "cancelled": cancelled, "on_progress": progress},
+                ModelReply.model_json_schema(),
+                INSTRUCTION,
+            )
+    except CodexCallInterrupted as exc:
+        completed = exc.response.get("turn_completed", False)
+        receipt.update(
+            response=exc.response,
+            status="received_after_cancel" if completed else "request_unknown",
+            cost=estimate_call_cost(snapshot, exc.response.get("usage", {}), outcome_unknown=not completed),
+            interruption_reason=exc.reason,
+        )
+        repo.patch("job", job_id, receipts=receipts)
+        if exc.reason == "cancelled":
+            raise InterruptedError("cancelled") from None
+        raise ValueError("request_unknown") from None
     except Exception as exc:
         receipt.update(
             status="request_unknown",
@@ -164,7 +223,7 @@ def assist(settings, repo, job_id, asset, config, cancelled, transport=None):
             phase = {
                 "range_us": [a["time_us"], b["time_us"]],
                 "frame_range": [a["frame_index"], b["frame_index"]],
-                "source": "gemini_visual_candidate",
+                "source": mode + "_visual_candidate",
                 "quality": "needs_review",
                 "receipt_id": receipt["id"],
             }

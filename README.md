@@ -6,7 +6,9 @@ phase correction, and written, image, and video reports. This is a separate proj
 
 **Status: runnable engineering V1.** The local vision workflow has been exercised on six
 real shooting clips. Coaching accuracy and training effectiveness require further validation.
-The optional Gemini adapter has boundary tests; a live paid call has not been tested here.
+Gemini and Astra are selectable. Astra supports the OpenAI API and a signed-in Codex CLI.
+The Codex transport has a successful live check on synthetic images; private shooting clips
+have not been sent through it in this validation run.
 
 ## Run locally
 
@@ -14,9 +16,20 @@ Requirements: Python 3.12 via [uv](https://docs.astral.sh/uv/), Node.js/npm, FFm
 The current build was validated on macOS Apple Silicon.
 
 ```sh
-cp .env.example .env
 ./start.sh
 ```
+
+The script creates `.env` if missing, installs locked dependencies, validates/downloads the
+vision models, starts the API, background worker and UI, and opens the browser once ready.
+On macOS, you can also double-click `start.command`.
+
+```sh
+./start.sh --check     # Check model/auth readiness, without starting servers
+./start.sh --no-open   # Start everything without opening a browser
+```
+
+Repeating startup reuses a running version of this app. An occupied port belonging to another
+instance produces a clear error; no other project is stopped. Edit `.env` to configure API keys.
 
 Open **http://127.0.0.1:5184/**. The API runs on **127.0.0.1:8002**; the launcher checks for
 conflicting listeners and stops only its own children. Initial startup installs locked
@@ -52,18 +65,44 @@ wrist height in two post-release windows, its change, projected elbow-angle chan
 loading-to-release timing. Missing body points or later context produce unavailable values,
 not zero. The UI gives one practice hypothesis to test in a matched retake.
 
-## Optional model assistance
+## Choose Gemini or Astra
 
-Set `GEMINI_API_KEY` on the server and choose **Local + Gemini**. The V1 adapter uses ordered
-JPEG frames with explicit frame identifiers (up to 80 by default), not native-video transport.
-It adds an evidence-checked phase candidate and structured observations; the local vision
-tracks still provide all numerical measurements. Astra and Qwen remain evaluation candidates.
+All modes retain the local body/ball tracks and numerical measurements. The model adds an
+evidence-checked release candidate and structured observations, linked to the input frames.
+The UI supports these choices:
 
-Each job permits at most six model calls by default and each call allows 16,000 output tokens.
-Intent, exact input frame IDs, response, usage, and a versioned list-price estimate are saved.
-There is no automatic retry. Usage survives invalid replies and cancellation after a response.
-An unknown request outcome keeps its cost unknown and blocks another paid request for that
-asset. Local analysis remains available. These estimates are not billing receipts.
+| Analysis mode | Authentication | Usage |
+| --- | --- | --- |
+| Local vision | None | No model API charge |
+| Gemini | `GEMINI_API_KEY` | Gemini API billing |
+| Astra (Codex) | Existing ChatGPT sign-in in Codex | Your Codex plan and usage limits |
+| Astra (API) | `OPENAI_API_KEY` | OpenAI API billing |
+
+Astra's requested model is `gpt-6-astra`. It receives timestamped JPEG frames; Astra's API
+supports images, not native video. The default maximum is 80 frames per clip, shared with
+Gemini. See [Astra model documentation](https://developers.openai.com/api/docs/models/gpt-6-astra).
+
+**Astra through Codex needs no OpenAI API key.** The app looks for a working `codex` executable
+and can use the Codex bundled with the ChatGPT/Codex desktop app. Set `SFC_CODEX_BIN` only if
+a specific executable is needed. Install a recent Codex CLI and run `codex login` with ChatGPT
+if you are not signed in. Startup reports readiness; unavailable modes are disabled.
+
+The runner uses `codex exec --image --json --output-schema`, an ephemeral session, read-only
+sandbox, disabled shell/apps/multi-agent tools, and explicit zero HTTP/stream retry settings.
+It ignores personal/project configuration for the analysis and uses saved ChatGPT authentication;
+it does not copy your login tokens into this repository. Inputs, local execution events, the final
+JSON and token usage are saved under `.data/receipts/`. The quota is not reported as a fake $0
+API charge. See [Codex automation](https://learn.chatgpt.com/docs/non-interactive-mode) and
+[authentication](https://learn.chatgpt.com/docs/auth).
+
+Each job permits at most six model calls by default. Direct API calls allow at most 16,000
+output tokens; Codex uses its CLI/model limits and a constrained final schema. There is no
+automatic retry. Usage is retained across invalid replies and cancellation. An unknown request
+outcome remains unknown and blocks another call to that provider for the same clip. Local
+analysis remains available. API prices are estimates; Codex plan usage is shown separately.
+
+Selecting a remote model and starting analysis sends the selected frames to that model's service.
+Keys and local runtime data remain outside Git. Qwen is still an evaluation candidate.
 
 ## Design and implementation
 

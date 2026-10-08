@@ -16,6 +16,9 @@ class Settings:
     model_id: str = "gemini-3.8-flash"
     workbench_data: Path | None = None
     max_upload_mb: int = 512
+    openai_api_key: str = ""
+    astra_model: str = "gpt-6-astra"
+    codex_bin: str | None = None
 
     @classmethod
     def from_env(cls):
@@ -26,6 +29,9 @@ class Settings:
             os.getenv("GEMINI_API_KEY", ""),
             (os.getenv("GEMINI_MODEL") or "gemini-3.8-flash"),
             Path(source).resolve() if source else None,
+            openai_api_key=os.getenv("OPENAI_API_KEY", ""),
+            astra_model=os.getenv("ASTRA_MODEL") or "gpt-6-astra",
+            codex_bin=os.getenv("SFC_CODEX_BIN") or None,
         )
 
     def prepare(self):

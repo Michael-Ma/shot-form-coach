@@ -68,6 +68,14 @@ type Asset = {
   report: Report | null;
   report_request?: { reference_asset_id?: string };
   model_error?: string;
+  analysis_config?: { mode: string };
+  model_assist?: {
+    observations: {
+      attribute: string;
+      interpretation: string;
+      evidence_frame_ids: string[];
+    }[];
+  };
 };
 type Job = {
   id: string;
@@ -97,7 +105,23 @@ const EN: Record<string, string> = {
   analyze: "Analyze this shot",
   all: "Analyze all shots",
   local: "Local vision",
-  gemini: "Local + Gemini",
+  gemini: "Gemini",
+  astra_codex: "Astra (Codex)",
+  astra_api: "Astra (API)",
+  codexHint: "Uses your signed-in Codex plan and its usage limits.",
+  apiHint: "Uses the configured API key; billed by the provider.",
+  codex_not_installed: "Codex is not installed or cannot run.",
+  codex_needs_update: "Update Codex to a recent version, then restart.",
+  codex_login_required: "Sign in to Codex with ChatGPT, then restart the app.",
+  openai_key_missing: "The OpenAI API key is not configured.",
+  codexPlan: "Codex plan usage",
+  modelReview: "Model observations",
+  follow_through: "Follow-through",
+  rhythm: "Rhythm",
+  model_visibility: "Visibility",
+  visible_change: "Visible change",
+  repeatable: "Appears steady within these frames",
+  uncertain: "Uncertain",
   mode: "Analysis method",
   hand: "Shooting hand",
   auto: "Estimate",
@@ -246,7 +270,23 @@ const ZH: Record<string, string> = {
   analyze: "分析这次投篮",
   all: "分析全部片段",
   local: "本地视觉",
-  gemini: "本地视觉 + Gemini",
+  gemini: "Gemini",
+  astra_codex: "Astra（Codex）",
+  astra_api: "Astra（API）",
+  codexHint: "使用当前 Codex 登录和订阅额度。",
+  apiHint: "使用已配置的 API key，由模型服务商计费。",
+  codex_not_installed: "未安装 Codex，或当前安装无法运行。",
+  codex_needs_update: "请更新到较新的 Codex 版本后重新启动。",
+  codex_login_required: "请通过 ChatGPT 登录 Codex 后重新启动。",
+  openai_key_missing: "尚未配置 OpenAI API key。",
+  codexPlan: "Codex 订阅额度",
+  modelReview: "模型观察",
+  follow_through: "随挥",
+  rhythm: "节奏",
+  model_visibility: "可见性",
+  visible_change: "可见变化",
+  repeatable: "这些帧中看起来较稳定",
+  uncertain: "无法确定",
   mode: "分析方式",
   hand: "出手侧",
   auto: "自动估计",
@@ -596,6 +636,8 @@ export default function App() {
     [jobs, setJobs] = useState<Job[]>([]),
     [health, setHealth] = useState<{
       gemini_configured: boolean;
+      astra_api_configured: boolean;
+      codex: { ready: boolean; reason: string | null };
       models_ready: boolean;
     }>(),
     [runs, setRuns] = useState<{ id: string; clip_count: number }[]>([]),
@@ -873,8 +915,22 @@ export default function App() {
                 <option value="gemini" disabled={!health?.gemini_configured}>
                   {t("gemini")}
                 </option>
+                <option value="astra_codex" disabled={!health?.codex.ready}>
+                  {t("astra_codex")}
+                </option>
+                <option
+                  value="astra_api"
+                  disabled={!health?.astra_api_configured}
+                >
+                  {t("astra_api")}
+                </option>
               </select>
             </label>
+            {mode !== "local" && (
+              <p className="muted">
+                {t(mode === "astra_codex" ? "codexHint" : "apiHint")}
+              </p>
+            )}
             <div className="settings-row">
               <label>
                 {t("hand")}
@@ -1311,6 +1367,37 @@ export default function App() {
               ) : (
                 report && <p className="muted">{t(report.comparison.reason)}</p>
               )}
+              {chosen.model_assist && (
+                <div className="model-observations">
+                  <h3>
+                    {t("modelReview")} ·{" "}
+                    {t(chosen.analysis_config?.mode || "unknown")}
+                  </h3>
+                  {chosen.model_assist.observations.map((o, i) => (
+                    <div key={i}>
+                      <p>
+                        {t(
+                          o.attribute === "visibility"
+                            ? "model_visibility"
+                            : o.attribute,
+                        )}{" "}
+                        · {t(o.interpretation)}
+                      </p>
+                      <button
+                        className="text-button"
+                        onClick={() => {
+                          const frame = chosen.frame_index.findIndex(
+                            (f) => f.frame_id === o.evidence_frame_ids[0],
+                          );
+                          if (frame >= 0) seek(frame);
+                        }}
+                      >
+                        {t("evidence")} ↗
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="cue">
                 <span className="eyebrow">{t("cue")}</span>
                 <p>
@@ -1400,10 +1487,22 @@ export default function App() {
                   <p className="cost">
                     {t("usage")}: {j.receipts.length}
                     <br />
-                    {j.receipts.some((r) => r.cost.estimated_usd === null)
-                      ? t("unknownCost")
-                      : `${t("estimated")} $${j.receipts.reduce((s, r) => s + (r.cost.estimated_usd || 0), 0).toFixed(5)}`}
-                    <small>{t("costScope")}</small>
+                    {j.receipts.every(
+                      (r) => r.cost.status === "subscription_usage",
+                    )
+                      ? t("codexPlan")
+                      : j.receipts.some((r) => r.cost.estimated_usd === null)
+                        ? t("unknownCost")
+                        : `${t("estimated")} $${j.receipts.reduce((s, r) => s + (r.cost.estimated_usd || 0), 0).toFixed(5)}`}
+                    <small>
+                      {t(
+                        j.receipts.every(
+                          (r) => r.cost.status === "subscription_usage",
+                        )
+                          ? "codexHint"
+                          : "costScope",
+                      )}
+                    </small>
                   </p>
                 ) : (
                   <p className="cost">{t("localCost")}</p>

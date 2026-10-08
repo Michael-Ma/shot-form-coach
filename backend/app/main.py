@@ -10,10 +10,12 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .analysis import measure
+from .codex_runner import codex_status
 from .config import ROOT, Settings
 from .contracts import CreateAnalysis, ImportWorkbench, PhaseCorrection, ReportRequest
 from .db import Repository
 from .media import MediaError, import_workbench, ingest
+from .provider import ensure_ready
 from .worker import Worker
 
 
@@ -60,9 +62,12 @@ def create_app(settings=None, start_worker=True):
         return {
             "status": "ok",
             "app": "shot-form-coach",
-            "version": "0.2.0",
+            "version": "0.3.0",
             "gemini_configured": bool(settings.api_key),
             "gemini_model": settings.model_id,
+            "astra_model": settings.astra_model,
+            "astra_api_configured": bool(settings.openai_api_key),
+            "codex": {k: v for k, v in codex_status(settings.codex_bin).items() if k != "binary"},
             "models_ready": all(
                 (settings.data_dir / "models" / p).is_file()
                 for p in ["pose_landmarker_full.task", "yolox_s.onnx"]
@@ -146,9 +151,11 @@ def create_app(settings=None, start_worker=True):
             get("asset", key)
         if len(set(request.asset_ids)) != len(request.asset_ids):
             raise HTTPException(422, "duplicate_assets")
-        if request.config.mode == "gemini" and not settings.api_key:
-            raise HTTPException(422, "api_key_missing")
-        if request.config.mode == "gemini" and len(request.asset_ids) > request.config.max_model_calls:
+        try:
+            ensure_ready(settings, request.config.mode)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from None
+        if request.config.mode != "local" and len(request.asset_ids) > request.config.max_model_calls:
             raise HTTPException(422, "model_call_budget_exhausted")
         return queue(
             "analysis",
