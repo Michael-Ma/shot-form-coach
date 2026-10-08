@@ -1,5 +1,5 @@
 /** @vitest-environment jsdom */
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 
@@ -19,15 +19,27 @@ const makeAsset = (id: string, label: string) => ({
   report_request: { reference_asset_id: undefined as string | undefined, assume_same_view: false },
 });
 let fixtureAssets: ReturnType<typeof makeAsset>[];
+let fixtureHealth: { models_ready: boolean; gemini_configured: boolean; astra_api_configured: boolean; workbench_configured: boolean; codex: { ready: boolean; reason: string } };
+let fixtureRuns: { id: string; clip_count: number }[];
+let stored: Map<string, string>;
+const openSettings = () => { fireEvent.click(screen.getByRole("button", { name: "Settings" })); return screen.getByRole("dialog", { name: "Settings" }); };
+const closeSettings = () => fireEvent.click(screen.getByRole("button", { name: "Close settings" }));
 beforeEach(() => {
-  vi.stubGlobal("localStorage", { getItem: () => null, setItem: vi.fn(), clear: vi.fn() });
+  stored = new Map();
+  vi.stubGlobal("localStorage", { getItem: (key: string) => stored.get(key) ?? null, setItem: vi.fn((key: string, value: string) => stored.set(key, value)), clear: () => stored.clear() });
+  fixtureHealth = { models_ready: true, gemini_configured: false, astra_api_configured: false, workbench_configured: false, codex: { ready: false, reason: "codex_login_required" } };
+  fixtureRuns = [];
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: function(this: HTMLDialogElement) { this.setAttribute("open", ""); this.querySelector<HTMLButtonElement>(".settings-close")?.focus(); } });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", { configurable: true, value: function(this: HTMLDialogElement) { this.removeAttribute("open"); this.dispatchEvent(new Event("close")); } });
   fixtureAssets = [makeAsset("a", "Shot A"), makeAsset("b", "Shot B")];
   Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
   vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => {});
   vi.stubGlobal("fetch", vi.fn(async (path: string, options?: RequestInit) => {
     if (path === "/api/assets") return { ok: true, json: async () => fixtureAssets };
-    if (path === "/api/jobs" || path === "/api/workbench/runs") return { ok: true, json: async () => [] };
-    if (path === "/api/health") return { ok: true, json: async () => ({ models_ready: true, gemini_configured: false, astra_api_configured: false, codex: { ready: false, reason: "codex_login_required" } }) };
+    if (path === "/api/jobs") return { ok: true, json: async () => [] };
+    if (path === "/api/workbench/runs") return { ok: true, json: async () => fixtureRuns };
+    if (path === "/api/health") return { ok: true, json: async () => fixtureHealth };
+    if (path === "/api/analyses" && options?.method === "POST") return { ok: true, json: async () => ({}) };
     if (path.includes("/tracks")) return { ok: true, json: async () => ({ frames: [] }) };
     if (path === "/api/assets/b/reports" && options?.method === "POST") {
       const body = JSON.parse(options.body as string);
@@ -47,7 +59,9 @@ describe("coaching-first review", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /Show this moment/ })[0]);
     expect(document.querySelector(".viewer img")?.getAttribute("src")).toBe("/api/assets/b/frames/1");
     expect(document.querySelector(".source-caption")?.textContent).toContain("10.500s");
+    openSettings();
     fireEvent.click(screen.getByRole("button", { name: "中文" }));
+    fireEvent.click(screen.getByRole("button", { name: "关闭设置" }));
     expect(await screen.findByText("先练结束动作")).toBeTruthy();
     expect(screen.getByText("出手节奏")).toBeTruthy();
     expect(screen.queryByText("Work on the finish")).toBeNull();
@@ -57,8 +71,10 @@ describe("coaching-first review", () => {
     await screen.findByText("Work on the finish");
     fireEvent.click(screen.getByText("Save or share this review"));
     expect(screen.getByRole("link", { name: /Written review/ }).getAttribute("href")).toBe("/api/reports/report-b/text");
-    fireEvent.click(document.querySelector(".comparison-disclosure > summary")!);
+    openSettings();
     fireEvent.change(screen.getByLabelText("Compare with another of your shots"), { target: { value: "a" } });
+    closeSettings();
+    fireEvent.click(document.querySelector(".comparison-disclosure > summary")!);
     expect(screen.getByTestId("comparison-stale")).toBeTruthy();
     expect(screen.queryByRole("link", { name: /Written review/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Update comparison" }));
@@ -69,8 +85,10 @@ describe("coaching-first review", () => {
     vi.stubGlobal("localStorage", { getItem: (key: string) => key === "sfc-mode" ? "astra_codex" : null, setItem: vi.fn() });
     render(<App />);
     await screen.findByText("Work on the finish");
+    openSettings();
     const select = screen.getByRole("combobox", { name: "Analysis method" }) as HTMLSelectElement;
     expect(select.value).toBe("astra_codex");
+    closeSettings();
     expect((screen.getByRole("button", { name: /Analyze this shot/ }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getAllByText("Sign in to Codex with ChatGPT, then restart the app.").length).toBeGreaterThan(0);
     expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
@@ -89,5 +107,129 @@ describe("coaching-first review", () => {
     await screen.findByText("No supported correction to rank yet");
     expect(screen.getByText(/This is not a clean bill of technique/)).toBeTruthy();
     expect(screen.queryByTestId("issue-card")).toBeNull();
+  });
+});
+
+
+describe("unified settings drawer", () => {
+  it("keeps every configuration input in a single labelled drawer and explains Workbench", async () => {
+    render(<App />);
+    await screen.findByText("Work on the finish");
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(document.querySelector(".sidebar")?.querySelector("select,input,details")).toBeNull();
+    const dialog = openSettings();
+    for (const label of ["Analysis method", "Shooting hand", "Camera view", "Shot context", "Compare with another of your shots", "Playback speed"]) {
+      expect(within(dialog).getByRole("combobox", { name: label })).toBeTruthy();
+    }
+    expect(within(dialog).getByRole("checkbox", { name: "Focus on movement" })).toBeTruthy();
+    expect(within(dialog).getByRole("checkbox", { name: "Pose overlay" })).toBeTruthy();
+    expect(within(dialog).getByRole("button", { name: "中文" })).toBeTruthy();
+    expect(within(dialog).getByText(/It is not another analysis model/)).toBeTruthy();
+    expect(within(dialog).getByText(/Workbench is not connected/)).toBeTruthy();
+    expect(within(dialog).queryByRole("button", { name: "Import & analyze" })).toBeNull();
+    expect(document.querySelectorAll("dialog")).toHaveLength(1);
+  });
+  it("retains valid preferences across closing and remounting, without analysis requests", async () => {
+    fixtureHealth.gemini_configured = true;
+    const app = render(<App />);
+    await screen.findByText("Work on the finish");
+    openSettings();
+    fireEvent.change(screen.getByLabelText("Analysis method"), { target: { value: "gemini" } });
+    fireEvent.change(screen.getByLabelText("Shooting hand"), { target: { value: "left" } });
+    fireEvent.change(screen.getByLabelText("Camera view"), { target: { value: "side" } });
+    fireEvent.change(screen.getByLabelText("Shot context"), { target: { value: "set_shot" } });
+    fireEvent.change(screen.getByLabelText("Playback speed"), { target: { value: "0.25" } });
+    fireEvent.click(screen.getByLabelText("Focus on movement"));
+    fireEvent.click(screen.getByLabelText("Pose overlay"));
+    closeSettings();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    app.unmount();
+    render(<App />);
+    await screen.findByText("Work on the finish");
+    openSettings();
+    for (const [label, value] of [["Analysis method", "gemini"], ["Shooting hand", "left"], ["Camera view", "side"], ["Shot context", "set_shot"], ["Playback speed", "0.25"]]) {
+      expect((screen.getByLabelText(label) as HTMLSelectElement).value).toBe(value);
+    }
+    expect((screen.getByLabelText("Focus on movement") as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByLabelText("Pose overlay") as HTMLInputElement).checked).toBe(true);
+    expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+    closeSettings();
+    fireEvent.click(screen.getByRole("button", { name: /Analyze this shot/ }));
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some(([path, init]) => path === "/api/analyses" && init?.method === "POST")).toBe(true));
+    const request = vi.mocked(fetch).mock.calls.find(([path]) => path === "/api/analyses")!;
+    expect(JSON.parse(request[1]!.body as string).config).toMatchObject({ mode: "gemini", handedness: "left", camera_view: "side", shot_type: "set_shot" });
+  });
+  it("closes on cancel or backdrop and returns focus to the settings button", async () => {
+    render(<App />);
+    await screen.findByText("Work on the finish");
+    const trigger = screen.getByRole("button", { name: "Settings" });
+    trigger.focus();
+    let dialog = openSettings();
+    expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Close settings" }));
+    fireEvent(dialog, new Event("cancel", { bubbles: false, cancelable: true }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    dialog = openSettings();
+    fireEvent.click(dialog, { clientX: -1, clientY: -1 });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+  it("wraps Tab at both dialog edges without intercepting browser shortcuts", async () => {
+    render(<App />);
+    await screen.findByText("Work on the finish");
+    const dialog = openSettings();
+    // jsdom has no layout; supply bounds for this focus-containment check only.
+    for (const element of dialog.querySelectorAll<HTMLElement>("a,button,input,select,textarea,summary,[tabindex]")) {
+      Object.defineProperty(element, "getClientRects", { value: () => element.hidden ? [] : [new DOMRect(0, 0, 44, 44)] });
+    }
+    const first = within(dialog).getByRole("button", { name: "Close settings" });
+    const last = within(dialog).getByRole("button", { name: "Back to review" });
+    first.focus();
+    fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: "Tab" });
+    expect(document.activeElement).toBe(first);
+    const shortcut = new KeyboardEvent("keydown", { key: "Tab", ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true });
+    fireEvent(first, shortcut);
+    expect(shortcut.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(first);
+  });
+  it("shows the correct configured-empty Workbench state and a usable run when one exists", async () => {
+    fixtureHealth.workbench_configured = true;
+    render(<App />);
+    await screen.findByText("Work on the finish");
+    const dialog = openSettings();
+    expect(within(dialog).getByText("No completed runs with clips are available yet.")).toBeTruthy();
+    fixtureRuns = [{ id: "test-run-12345678", clip_count: 3 }];
+    fireEvent.click(within(dialog).getByRole("button", { name: "Check again" }));
+    await within(dialog).findByRole("combobox", { name: "Completed Workbench run" });
+    expect(within(dialog).getByRole("option", { name: "12345678 · 3 clips" })).toBeTruthy();
+    expect((within(dialog).getByRole("button", { name: "Import & analyze" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+  });
+  it("keeps upload failures visible inside the open drawer without starting analysis", async () => {
+    render(<App />);
+    await screen.findByText("Work on the finish");
+    const dialog = openSettings();
+    const body = dialog.querySelector(".settings-body") as HTMLDivElement;
+    body.scrollTop = 700;
+    vi.mocked(fetch).mockImplementationOnce(async () => ({ ok: false, json: async () => ({ detail: "invalid_or_long_video" }) } as Response));
+    fireEvent.change(dialog.querySelector("input[type=file]")!, { target: { files: [new File(["synthetic test"], "test.mp4", { type: "video/mp4" })] } });
+    expect(await within(dialog).findByRole("alert")).toBeTruthy();
+    expect(within(dialog).getByText("Choose a readable video of at most 30 seconds.")).toBeTruthy();
+    expect(body.scrollTop).toBe(0);
+    expect(screen.getByRole("dialog", { name: "Settings" })).toBeTruthy();
+    expect(vi.mocked(fetch).mock.calls.some(([path]) => path === "/api/analyses")).toBe(false);
+  });
+  it("validates saved options instead of displaying invalid preferences", async () => {
+    for (const key of ["sfc-lang", "sfc-mode", "sfc-hand", "sfc-view", "sfc-shot", "sfc-speed", "sfc-focus", "sfc-pose"]) stored.set(key, "invalid");
+    render(<App />);
+    await screen.findByText("Work on the finish");
+    openSettings();
+    expect((screen.getByLabelText("Analysis method") as HTMLSelectElement).value).toBe("local");
+    expect((screen.getByLabelText("Playback speed") as HTMLSelectElement).value).toBe("0.5");
+    expect((screen.getByLabelText("Shooting hand") as HTMLSelectElement).value).toBe("auto");
+    expect((screen.getByLabelText("Focus on movement") as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByLabelText("Pose overlay") as HTMLInputElement).checked).toBe(false);
   });
 });

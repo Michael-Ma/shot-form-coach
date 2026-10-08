@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
 type Bilingual = { en: string; zh: string };
 type CoachingIssue = {
@@ -699,9 +699,60 @@ const REVIEW_ZH: Record<string, string> = {
   import: "添加投篮", local: "本地视觉", release: "修正离手区间", details: "更多细节",
   referenceUsed: "使用的参照", loadingShots: "正在加载你的投篮…", setup: "需要配置", exportsLanguage: "已保存报告语言",
 };
+const SETTINGS_EN: Record<string, string> = {
+  settingsTitle: "Settings", settingsHelp: "Everything you need for your next review.", closeSettings: "Close settings", doneSettings: "Back to review",
+  analysisSection: "Analysis", importSection: "Add shots", comparisonSection: "Comparison", playbackSection: "Playback", languageSection: "Language",
+  nextAnalysis: "These choices apply when you next analyze. Changing a setting does not rerun a review.",
+  selectedMethod: "Next analysis", configureAnalysis: "Choose in Settings", uploadAnalyze: "Choose a video & analyze", importAnalyze: "Import & analyze",
+  importMethod: "New clips will be analyzed with", fromDevice: "From this device", fromDeviceHelp: "Choose a short video containing one complete shot.",
+  workbench: "Import pre-cut shots", workbenchHelp: "From Video Event Workbench: imports shooting clips from completed runs and keeps their original video times. It is not another analysis model.",
+  workbenchWhen: "Use this if you have already split a longer video into shots in Workbench. Otherwise, choose a video above.",
+  workbenchRun: "Completed Workbench run", workbenchClips: "clips", workbenchUnconfigured: "Workbench is not connected. You can still add a video from this device.",
+  workbenchEmpty: "No completed runs with clips are available yet.", workbenchLoading: "Checking completed Workbench runs…", workbenchLoadError: "Could not load Workbench runs. Try again.", reloadRuns: "Check again",
+  settingsSaved: "Preferences are saved in this browser.", playbackHelp: "These preferences apply immediately to the video preview.",
+  languageHelp: "Changes the interface and the language used for your next report export.",
+  comparisonScope: "For the selected shot", comparisonEmpty: "Add a shot first, then choose a personal reference here.",
+  referenceMissing: "Add another shot to compare your movement.", noReferenceHelp: "Choose a reference in Settings to view your shots side by side.",
+  settingsEmpty: "Open Settings to add your first shot", playbackNow: "Playback", comparisonResults: "Personal comparison",
+};
+const SETTINGS_ZH: Record<string, string> = {
+  settingsTitle: "设置", settingsHelp: "下一次复盘需要的选项，都在这里。", closeSettings: "关闭设置", doneSettings: "回到复盘",
+  analysisSection: "分析", importSection: "添加投篮", comparisonSection: "对比", playbackSection: "播放", languageSection: "语言",
+  nextAnalysis: "这些选项用于下一次分析。修改设置不会自动重新分析。",
+  selectedMethod: "下次分析", configureAnalysis: "在设置中选择", uploadAnalyze: "选择视频并分析", importAnalyze: "导入并分析",
+  importMethod: "新片段将使用以下方式分析", fromDevice: "从电脑选择视频", fromDeviceHelp: "选择一个包含完整投篮动作的短视频。",
+  workbench: "导入已截好的投篮", workbenchHelp: "来自 Video Event Workbench：读取已完成任务中的投篮短片段，并保留原视频时间；不是另一种分析模型。",
+  workbenchWhen: "如果你已经用 Workbench 把长视频截成一球一段，可以从这里导入；否则直接在上方选择视频即可。",
+  workbenchRun: "已完成的 Workbench 任务", workbenchClips: "个片段", workbenchUnconfigured: "尚未连接 Workbench，仍可直接从电脑添加视频。",
+  workbenchEmpty: "暂时没有包含投篮片段的已完成任务。", workbenchLoading: "正在查找已完成的 Workbench 任务…", workbenchLoadError: "暂时无法读取 Workbench 任务，请重试。", reloadRuns: "重新查找",
+  settingsSaved: "偏好设置已保存在当前浏览器。", playbackHelp: "这些选项会立即应用到视频预览。",
+  languageHelp: "切换界面语言，同时用于下一次生成的报告。",
+  comparisonScope: "用于当前投篮", comparisonEmpty: "添加投篮后，可在这里选择自己的参照球。",
+  referenceMissing: "再添加一球，就可以比较自己的动作。", noReferenceHelp: "在设置中选择参照球，可并排回看自己的动作。",
+  settingsEmpty: "打开设置，添加第一球", playbackNow: "播放", comparisonResults: "个人动作对比",
+};
+function savedChoice(key: string, allowed: string[], fallback: string) {
+  try { const value = localStorage.getItem(key); return value && allowed.includes(value) ? value : fallback; } catch { return fallback; }
+}
+function savePreference(key: string, value: string) {
+  try { localStorage.setItem(key, value); } catch { /* The app still works when browser storage is unavailable. */ }
+}
+function keepSettingsFocus(event: KeyboardEvent<HTMLDialogElement>) {
+  if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return;
+  const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("a[href], button, input:not([type=hidden]), select, textarea, summary, [tabindex]"))
+    .filter((element) => element.tabIndex >= 0 && !element.matches(":disabled") && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== "hidden");
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (!first || !last) return;
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault(); last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault(); first.focus();
+  }
+}
 export default function App() {
-  const [lang, setLang] = useState(() => localStorage.getItem("sfc-lang") || "en");
-  const t = (k: string) => (lang === "zh" ? REVIEW_ZH : REVIEW_EN)[k] || (lang === "zh" ? ZH : EN)[k] || EN[k] || k;
+  const [lang, setLang] = useState(() => savedChoice("sfc-lang", ["en", "zh"], "en"));
+  const t = (k: string) => (lang === "zh" ? SETTINGS_ZH : SETTINGS_EN)[k] || (lang === "zh" ? REVIEW_ZH : REVIEW_EN)[k] || (lang === "zh" ? ZH : EN)[k] || EN[k] || k;
   const cText = (value: Bilingual | undefined) => value ? value[lang === "zh" ? "zh" : "en"] || value.en || "" : "";
   const [assets, setAssets] = useState<Asset[]>([]);
   const [selected, setSelected] = useState("");
@@ -710,23 +761,42 @@ export default function App() {
   const [reference, setReference] = useState("");
   const [sameView, setSameView] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [health, setHealth] = useState<{ gemini_configured: boolean; astra_api_configured: boolean; codex: { ready: boolean; reason: string | null }; models_ready: boolean }>();
+  const [health, setHealth] = useState<{ gemini_configured: boolean; astra_api_configured: boolean; codex: { ready: boolean; reason: string | null }; models_ready: boolean; workbench_configured?: boolean }>();
   const [runs, setRuns] = useState<{ id: string; clip_count: number }[]>([]);
   const [run, setRun] = useState("");
-  const [focused, setFocused] = useState(true);
+  const [focused, setFocused] = useState(() => savedChoice("sfc-focus", ["true", "false"], "true") === "true");
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [showPose, setShowPose] = useState(false);
+  const [showPose, setShowPose] = useState(() => savedChoice("sfc-pose", ["true", "false"], "false") === "true");
   const [last, setLast] = useState<number | null>(null);
   const [first, setFirst] = useState<number | null>(null);
-  const [mode, setMode] = useState(() => { const saved = localStorage.getItem("sfc-mode"); return saved && ["local", "gemini", "astra_codex", "astra_api"].includes(saved) ? saved : "local"; });
-  const [hand, setHand] = useState("auto");
-  const [view, setView] = useState("oblique");
-  const [shot, setShot] = useState("stationary_jump_shot");
+  const [mode, setMode] = useState(() => savedChoice("sfc-mode", ["local", "gemini", "astra_codex", "astra_api"], "local"));
+  const [hand, setHand] = useState(() => savedChoice("sfc-hand", ["auto", "right", "left"], "auto"));
+  const [view, setView] = useState(() => savedChoice("sfc-view", ["oblique", "side", "front", "unknown"], "oblique"));
+  const [shot, setShot] = useState(() => savedChoice("sfc-shot", ["stationary_jump_shot", "set_shot", "unknown"], "stationary_jump_shot"));
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
-  const [speed, setSpeed] = useState("0.5");
+  const [speed, setSpeed] = useState(() => savedChoice("sfc-speed", ["0.25", "0.5", "1"], "0.5"));
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [runsState, setRunsState] = useState<"loading" | "ready" | "error">("loading");
+  const settingsDialog = useRef<HTMLDialogElement>(null);
+  const settingsTrigger = useRef<HTMLButtonElement>(null);
+  const settingsOpener = useRef<HTMLElement | null>(null);
+  const settingsBody = useRef<HTMLDivElement>(null);
+  function openSettings() {
+    settingsOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setSettingsOpen(true);
+  }
+  function closeSettings() { setSettingsOpen(false); }
+  async function loadRuns() {
+    setRunsState("loading");
+    try {
+      const available = await api<typeof runs>("/workbench/runs");
+      setRuns(available); setRun((value) => available.some((item) => item.id === value) ? value : available[0]?.id || "");
+      setRunsState("ready");
+    } catch { setRunsState("error"); }
+  }
   const [evidenceLabel, setEvidenceLabel] = useState("");
   const video = useRef<HTMLVideoElement>(null);
   const upload = useRef<HTMLInputElement>(null);
@@ -756,7 +826,7 @@ export default function App() {
   useEffect(() => {
     void refresh().catch((e) => { setError(e.message); setLoaded(true); });
     void api<typeof health>("/health").then(setHealth).catch((e) => setError(e.message));
-    void api<typeof runs>("/workbench/runs").then((r) => { setRuns(r); setRun(r[0]?.id || ""); }).catch(() => {});
+    void loadRuns();
   }, []);
   useEffect(() => {
     if (!active) return;
@@ -780,9 +850,28 @@ export default function App() {
     if (reference) void api<{ frames: TrackFrame[] }>(`/assets/${reference}/tracks`).then((r) => { if (live) setRefTracks(r.frames); }).catch(() => {});
     return () => { live = false; };
   }, [reference, ref?.revision]);
-  useEffect(() => { document.documentElement.lang = lang; localStorage.setItem("sfc-lang", lang); setEvidenceLabel(""); }, [lang]);
-  useEffect(() => { localStorage.setItem("sfc-mode", mode); }, [mode]);
+  useEffect(() => { document.documentElement.lang = lang; savePreference("sfc-lang", lang); setEvidenceLabel(""); }, [lang]);
+  useEffect(() => { savePreference("sfc-mode", mode); }, [mode]);
   useEffect(() => { if (video.current) video.current.playbackRate = Number(speed); }, [speed, selected]);
+  useEffect(() => {
+    savePreference("sfc-hand", hand); savePreference("sfc-view", view); savePreference("sfc-shot", shot);
+    savePreference("sfc-speed", speed); savePreference("sfc-focus", String(focused)); savePreference("sfc-pose", String(showPose));
+  }, [hand, view, shot, speed, focused, showPose]);
+  useEffect(() => {
+    const dialog = settingsDialog.current;
+    if (!dialog) return;
+    if (settingsOpen) {
+      dialog.showModal();
+      if (settingsBody.current) settingsBody.current.scrollTop = 0;
+      const previousOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = previousOverflow; };
+    }
+    if (dialog.open) {
+      dialog.close();
+      (settingsOpener.current?.isConnected ? settingsOpener.current : settingsTrigger.current)?.focus();
+    }
+  }, [settingsOpen]);
   const ownCrop = chosen ? crop(chosen, tracks, focused) : [0, 0, 1, 1];
   const refCrop = ref ? crop(ref, refTracks, focused) : [0, 0, 1, 1];
   const ownAnchor = chosen ? anchor(chosen) : null;
@@ -791,7 +880,7 @@ export default function App() {
   const refIndex = ref ? nearest(ref, (refAnchor ?? ref.duration_us / 2) + relative) : 0;
   async function action(fn: () => Promise<void>) {
     setBusy(true); setError("");
-    try { await fn(); await refresh(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+    try { await fn(); await refresh(); return true; } catch (e) { setError((e as Error).message); if (settingsBody.current) settingsBody.current.scrollTop = 0; return false; } finally { setBusy(false); }
   }
   async function analyze(ids: string[]) {
     await api("/analyses", { ...post({ asset_ids: ids, config: { mode, handedness: hand, camera_view: view, shot_type: shot, locale: lang, max_model_calls: 6 } }), headers: { "Content-Type": "application/json", "Idempotency-Key": crypto.randomUUID() } });
@@ -833,22 +922,11 @@ export default function App() {
     <>
       <header className="app-header">
         <a className="brand" href="/"><span className="mark" aria-hidden="true">↗</span><div><strong>{t("title")}</strong><small>{t("subtitle")}</small></div></a>
-        <div className="language" aria-label="Language"><button aria-pressed={lang === "en"} className={lang === "en" ? "selected" : ""} onClick={() => setLang("en")}>EN</button><button aria-pressed={lang === "zh"} className={lang === "zh" ? "selected" : ""} onClick={() => setLang("zh")}>中文</button></div>
+        <button className="settings-trigger" ref={settingsTrigger} onClick={openSettings} aria-haspopup="dialog" aria-expanded={settingsOpen} aria-controls="settings-dialog"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M4 17h16M8 4v6M16 14v6" /></svg><span>{t("settingsTitle")}</span></button>
       </header>
       <main>
         <aside className="sidebar" aria-label={t("session")}>
           <div className="section-title"><h2>{t("session")}</h2><span className="count">{assets.length}</span></div>
-          <input type="file" accept="video/*" hidden ref={upload} onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void action(async () => {
-              const form = new FormData(); form.append("file", file);
-              const a = await api<Asset>("/assets/upload", { method: "POST", body: form });
-              setSelected(a.id); await analyze([a.id]);
-            });
-            e.target.value = "";
-          }} />
-          <button className="import" disabled={!canStart} onClick={() => upload.current?.click()}>＋ {t("import")}</button>
-          <p className="upload-hint">{t("uploadHint")}</p>
           <nav className="shot-list" aria-label={t("session")}>
             {assets.slice().reverse().map((a) => <button className={`shot ${selected === a.id ? "current" : ""}`} aria-current={selected === a.id ? "true" : undefined} key={a.id} onClick={() => setSelected(a.id)}>
               <img src={`/api/assets/${a.id}/frames/${Math.max(0, Math.min(10, a.frame_index.length - 1))}`} alt="" loading="lazy" />
@@ -856,31 +934,11 @@ export default function App() {
               {selected === a.id && <span className="shot-arrow" aria-hidden="true">↗</span>}
             </button>)}
           </nav>
-          <details className="sidebar-disclosure analysis-settings">
-            <summary>{t("advanced")}<span>{t(mode)}</span></summary>
-            <div className="settings">
-              <p className="muted">{t(mode === "local" ? "methodHint" : mode === "astra_codex" ? "codexHint" : "apiHint")}</p>
-              <details className="provider-help"><summary>{t("providers")}</summary><ul>
-                {!health?.gemini_configured && <li>Gemini: {t("noKey")}</li>}
-                {!health?.codex?.ready && <li>Astra / Codex: {t(health?.codex?.reason || "codex_not_installed")}</li>}
-                {!health?.astra_api_configured && <li>Astra / API: {t("openai_key_missing")}</li>}
-                {health?.gemini_configured && <li>Gemini · {t("providerReady")}</li>}
-                {health?.codex?.ready && <li>Astra / Codex · {t("providerReady")}</li>}
-                {health?.astra_api_configured && <li>Astra / API · {t("providerReady")}</li>}
-              </ul></details>
-              <div className="settings-row"><label>{t("hand")}<select value={hand} onChange={(e) => setHand(e.target.value)}>{["auto", "right", "left"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label><label>{t("view")}<select value={view} onChange={(e) => setView(e.target.value)}>{["oblique", "side", "front", "unknown"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label></div>
-              <label>{t("shot")}<select value={shot} onChange={(e) => setShot(e.target.value)}>{["stationary_jump_shot", "set_shot", "unknown"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label>
-              <button disabled={!canStart || !assets.length} onClick={() => void action(() => analyze(assets.map((a) => a.id)))}>{t("all")}</button>
-            </div>
-          </details>
-          {runs.length > 0 && <details className="sidebar-disclosure"><summary>{t("moreImport")}</summary><div className="workbench"><select aria-label={t("workbench")} value={run} onChange={(e) => setRun(e.target.value)}>{runs.map((r) => <option key={r.id} value={r.id}>{r.id.slice(-8)} · {r.clip_count}</option>)}</select><button disabled={!canStart || !run} onClick={() => void action(async () => { const a = await api<Asset[]>("/workbench/import", post({ run_id: run })); if (a.length) { setSelected(a[0].id); await analyze(a.map((v) => v.id)); } })}>{t("workbench")}</button></div></details>}
-          {health?.models_ready === false && <p className="notice">{t("missingModels")}</p>}
-          <p className="sidebar-note">{t("cameraHint")}</p>
         </aside>
         <div className="workspace">
-          {error && <div className="error" role="alert">{t(error)}</div>}
+          {error && !settingsOpen && <div className="error" role="alert">{t(error)}</div>}
           {!loaded ? <div className="empty" role="status">{t("loadingShots")}</div> : chosen ? <>
-            <div className="review-heading"><div><span className="eyebrow">{t("review")}</span><h1>{chosen.label}</h1></div><div className="review-actions">{methodSelect}<button className="primary analyze-button" disabled={!canAnalyze} onClick={() => void action(() => analyze([selected]))}>{analyzingChosen ? t("analyzing") : t("analyze")} <span aria-hidden="true">↗</span></button>{mode !== "local" && <p className="mode-note">{t(modeReady ? mode === "astra_codex" ? "codexHint" : "apiHint" : modeProblem)}</p>}</div></div>
+            <div className="review-heading"><div><span className="eyebrow">{t("review")}</span><h1>{chosen.label}</h1></div><div className="review-actions"><span className="analysis-method-summary">{t("selectedMethod")} · <strong>{t(mode)}</strong></span><button className="primary analyze-button" disabled={!canAnalyze} onClick={() => void action(() => analyze([selected]))}>{analyzingChosen ? t("analyzing") : t("analyze")} <span aria-hidden="true">↗</span></button>{!modeReady && <p className="mode-note">{t(modeProblem)}</p>}{health?.models_ready === false && <p className="mode-note">{t("missingModels")}</p>}</div></div>
             {analyzingChosen ? <section className="coaching-summary processing" role="status"><span className="eyebrow">{t("analyzing")}</span><h2>{t("analyzingTitle")}</h2><p>{t("analyzingHelp")}</p><progress aria-label={t("analyzing")} /></section> : coaching && coaching.status !== "awaiting_analysis" ? <>
               <section className="coaching-summary" ref={summarySection} tabIndex={-1} data-testid="coaching-summary" aria-label={t("overview")}>
                 <div className="summary-kicker"><span className="eyebrow">{t("overview")}</span><span className={`pill ${coaching.status === "limited" ? "amber" : ""}`}>{t(coaching.status === "limited" ? "limited" : hasVisualReview ? "visualReview" : "movementSummary")}</span></div>
@@ -911,22 +969,68 @@ export default function App() {
                   {!playing && <img style={cropStyle(chosen, ownCrop)} src={`/api/assets/${chosen.id}/frames/${index}`} alt={`${chosen.label}, ${t("frame")} ${index}`} />}
                   <div className="overlay-space" style={cropStyle(chosen, ownCrop)}><Pose frame={tracks[index]} show={showPose} /></div>
                 </div><div className="source-caption"><span>{t("source")} {((chosen.frame_index[index]?.source_time_us || 0) / 1e6).toFixed(3)}s</span><span>{t("frame")} {chosen.frame_index[index]?.source_frame_index ?? index}</span></div></div>
-                {ref ? <div className="video-reference"><div className="viewer-top"><strong>{ref.label}</strong><span>{relative >= 0 ? "+" : ""}{(relative / 1e6).toFixed(2)}s</span></div><div className="viewer" style={{ aspectRatio: `${refCrop[2] - refCrop[0]}/${refCrop[3] - refCrop[1]}`, maxWidth: `${440 * (refCrop[2] - refCrop[0]) / (refCrop[3] - refCrop[1])}px`, marginInline: "auto" }}><img style={cropStyle(ref, refCrop)} src={`/api/assets/${ref.id}/frames/${refIndex}`} alt={`${ref.label}, ${t("frame")} ${refIndex}`} /><div className="overlay-space" style={cropStyle(ref, refCrop)}><Pose frame={refTracks[refIndex]} show={showPose} /></div></div><div className="source-caption"><span>{t("source")} {((ref.frame_index[refIndex]?.source_time_us || 0) / 1e6).toFixed(3)}s</span><span>{t("frame")} {ref.frame_index[refIndex]?.source_frame_index ?? refIndex}</span></div><p className="alignment-note">{t(ownAnchor !== null && refAnchor !== null ? "matchingRelease" : "approximateAlignment")}</p></div> : <div className="video-guide"><span className="eyebrow">{t("details")}</span><h3>{t("focus")}</h3><p>{t("evidenceNote")}</p><div className="video-options"><label className="check"><input type="checkbox" checked={focused} onChange={(e) => setFocused(e.target.checked)} />{t("focus")}</label><label className="check"><input type="checkbox" checked={showPose} onChange={(e) => setShowPose(e.target.checked)} />{t("pose")}</label></div>{chosen.phases.release && <button onClick={() => seek(chosen.phases.release!.frame_range[0])}>{t("releaseJump")} ↗</button>}</div>}
+                {ref ? <div className="video-reference"><div className="viewer-top"><strong>{ref.label}</strong><span>{relative >= 0 ? "+" : ""}{(relative / 1e6).toFixed(2)}s</span></div><div className="viewer" style={{ aspectRatio: `${refCrop[2] - refCrop[0]}/${refCrop[3] - refCrop[1]}`, maxWidth: `${440 * (refCrop[2] - refCrop[0]) / (refCrop[3] - refCrop[1])}px`, marginInline: "auto" }}><img style={cropStyle(ref, refCrop)} src={`/api/assets/${ref.id}/frames/${refIndex}`} alt={`${ref.label}, ${t("frame")} ${refIndex}`} /><div className="overlay-space" style={cropStyle(ref, refCrop)}><Pose frame={refTracks[refIndex]} show={showPose} /></div></div><div className="source-caption"><span>{t("source")} {((ref.frame_index[refIndex]?.source_time_us || 0) / 1e6).toFixed(3)}s</span><span>{t("frame")} {ref.frame_index[refIndex]?.source_frame_index ?? refIndex}</span></div><p className="alignment-note">{t(ownAnchor !== null && refAnchor !== null ? "matchingRelease" : "approximateAlignment")}</p></div> : <div className="video-guide"><span className="eyebrow">{t("details")}</span><h3>{t("evidence")}</h3><p>{t("evidenceNote")}</p>{chosen.phases.release && <button onClick={() => seek(chosen.phases.release!.frame_range[0])}>{t("releaseJump")} ↗</button>}</div>}
               </div>
-              <div className="transport"><button aria-label={t(playing ? "pause" : "play")} onClick={() => { if (playing) { video.current?.pause(); setPlaying(false); } else { if (video.current && video.current.ended) video.current.currentTime = 0; setPlaying(true); void video.current?.play().catch(() => setPlaying(false)); } }}>{playing ? "Ⅱ" : "▶"}<span>{t(playing ? "pause" : "play")}</span></button><input aria-label={t("timeline")} type="range" min="0" max={Math.max(0, chosen.frame_index.length - 1)} value={index} onChange={(e) => seek(Number(e.target.value))} /><span className="clip-time">{((chosen.frame_index[index]?.time_us || 0) / 1e6).toFixed(2)} / {(chosen.duration_us / 1e6).toFixed(1)}s</span><select aria-label={t("slow")} value={speed} onChange={(e) => setSpeed(e.target.value)}>{["0.25", "0.5", "1"].map((v) => <option key={v} value={v}>{v}×</option>)}</select></div>
-              {ref && <div className="video-options inline"><label className="check"><input type="checkbox" checked={focused} onChange={(e) => setFocused(e.target.checked)} />{t("focus")}</label><label className="check"><input type="checkbox" checked={showPose} onChange={(e) => setShowPose(e.target.checked)} />{t("pose")}</label></div>}
+              <div className="transport"><button aria-label={t(playing ? "pause" : "play")} onClick={() => { if (playing) { video.current?.pause(); setPlaying(false); } else { if (video.current && video.current.ended) video.current.currentTime = 0; setPlaying(true); void video.current?.play().catch(() => setPlaying(false)); } }}>{playing ? "Ⅱ" : "▶"}<span>{t(playing ? "pause" : "play")}</span></button><input aria-label={t("timeline")} type="range" min="0" max={Math.max(0, chosen.frame_index.length - 1)} value={index} onChange={(e) => seek(Number(e.target.value))} /><span className="clip-time">{((chosen.frame_index[index]?.time_us || 0) / 1e6).toFixed(2)} / {(chosen.duration_us / 1e6).toFixed(1)}s</span><span className="playback-speed" aria-label={`${t("slow")} ${speed}×`}>{speed}×</span></div>
+
               <details className="disclosure frame-tools"><summary>{t("reviewTools")}</summary><div className="disclosure-body"><div className="step-buttons"><button onClick={() => seek(index - 1)} disabled={index === 0}>← {t("prev")}</button><button onClick={() => seek(index + 1)} disabled={index >= chosen.frame_index.length - 1}>{t("next")} →</button><span>{t("frame")} {index}</span></div><h3>{t("release")}</h3>{chosen.phases.release ? <p className="interval">{chosen.phases.release.range_us.map((v) => (v / 1e6).toFixed(3)).join(" – ")}s <span className="pill">{t(["manual", "user_corrected"].includes(chosen.phases.release.source) ? "reviewedInterval" : "candidate")}</span></p> : <p className="muted">{ready ? t("notKnown") : t("noMetrics")}</p>}{ready && <><p className="muted">{t("phaseHelp")}</p><div className="phase-actions"><button className={last !== null ? "chosen" : ""} onClick={() => { setLast(index); seek(index); }}>{t("last")}{last !== null ? ` · ${last}` : ""}</button><button className={first !== null ? "chosen" : ""} onClick={() => { setFirst(index); seek(index); }}>{t("first")}{first !== null ? ` · ${first}` : ""}</button><button className="primary" disabled={!validSave || generating} onClick={() => void action(save)}>{t("save")}</button>{(last !== null || first !== null) && <button onClick={() => { setLast(null); setFirst(null); }}>{t("reset")}</button>}</div></>}</div></details>
-              <details className="disclosure comparison-disclosure"><summary>{t("comparator")}<span>{ref?.label || t("noReference")}</span></summary><div className="disclosure-body"><p className="muted">{t("comparisonNote")}</p><div className="comparison-controls"><label>{t("comparator")}<select value={reference} onChange={(e) => setReference(e.target.value)}><option value="">{t("noReference")}</option>{assets.filter((a) => a.id !== selected).map((a) => <option key={a.id} value={a.id}>{a.label}{!a.measurements ? ` · ${t("ready")}` : ""}</option>)}</select></label>{reference && <label className="check"><input type="checkbox" checked={sameView} onChange={(e) => setSameView(e.target.checked)} />{t("sameView")}</label>}<button className="primary" disabled={!ready || generating || !!(ref && !ref.measurements)} onClick={() => void action(updateReport)}>{t("compare")}</button></div>{ref && !ref.measurements && <p className="notice">{t("reference_unanalyzed")}</p>}{!reportMatches && report && <p className="notice" data-testid="comparison-stale">{t("comparisonDraft")}</p>}{reportMatches && reference && <div className="comparison-result"><h3>{t("comparisonLabel")} · {ref?.label}</h3>{report.comparison.differences.length ? <dl>{report.comparison.differences.map((d) => <div key={d.key}><dt>{t(d.key)}</dt><dd>{d.difference >= 0 ? "+" : ""}{d.difference.toFixed(d.unit === "milliseconds" ? 0 : 2)} {t(d.unit)}</dd></div>)}</dl> : <p className="muted">{t(report.comparison.reason)}</p>}</div>}</div></details>
+              <details className="disclosure comparison-disclosure"><summary>{t("comparisonResults")}<span>{ref?.label || t("noReference")}</span></summary><div className="disclosure-body"><p className="muted">{reference ? t("comparisonNote") : t("noReferenceHelp")}</p>{reference && <button className="primary" disabled={!ready || generating || !!(ref && !ref.measurements)} onClick={() => void action(updateReport)}>{t("compare")}</button>}{ref && !ref.measurements && <p className="notice">{t("reference_unanalyzed")}</p>}{!reportMatches && report && <p className="notice" data-testid="comparison-stale">{t("comparisonDraft")}</p>}{reportMatches && reference && <div className="comparison-result"><h3>{t("comparisonLabel")} · {ref?.label}</h3>{report.comparison.differences.length ? <dl>{report.comparison.differences.map((d) => <div key={d.key}><dt>{t(d.key)}</dt><dd>{d.difference >= 0 ? "+" : ""}{d.difference.toFixed(d.unit === "milliseconds" ? 0 : 2)} {t(d.unit)}</dd></div>)}</dl> : <p className="muted">{t(report.comparison.reason)}</p>}</div>}</div></details>
             </section>
             <section className="secondary-details" aria-label={t("details")}>
               {ready && <details className="disclosure"><summary>{t("raw")}</summary><div className="disclosure-body"><p className="muted">{t("rawHelp")} {t("visibility")} {chosen.measurements!.visible_frames}/{chosen.measurements!.total_frames}</p><div className="raw-metrics">{chosen.measurements!.measurements.map((m) => <div key={m.key}><span>{t(m.key)}</span><strong>{m.value === null ? "—" : m.value.toFixed(m.unit === "milliseconds" ? 0 : 2)} <small>{t(m.unit)}</small></strong>{m.reason && <p>{t(m.reason)}</p>}{evidenceButton(m.evidence_frame_ids, t(m.key))}</div>)}</div><Curve asset={chosen} current={index} onSeek={seek} t={t} />{chosen.measurements!.flags.length > 0 && <ul className="limits-list">{chosen.measurements!.flags.map((f) => <li key={f}>{t(f)}</li>)}</ul>}{chosen.model_assist && <div className="model-observations"><h3>{t("modelReview")} · {t(chosen.analysis_config?.mode || "unknown")}</h3>{chosen.model_assist.observations.map((o, i) => <div key={i}><p>{t(o.attribute === "visibility" ? "model_visibility" : o.attribute)} · {t(o.interpretation)}</p>{evidenceButton(o.evidence_frame_ids, t(o.attribute))}</div>)}</div>}</div></details>}
               <details className="disclosure"><summary>{t("sourceDetail")}</summary><div className="disclosure-body"><p className="muted">{t("limits")}</p>{coaching?.limitations.length ? <ul className="limits-list">{coaching.limitations.map((l, i) => <li key={i}>{cText(l)}</li>)}</ul> : null}<div className="sources">{report?.sources.map((s) => <a key={s.id} href={s.url} target="_blank" rel="noreferrer">{s.title || s.id} ↗</a>)}</div></div></details>
               <details className="disclosure downloads"><summary>{t("downloads")}</summary><div className="disclosure-body">{exportMatches ? <><p className="muted">{chosen.label} · {t("revision")} {chosen.revision} · {t("exportsLanguage")}: {report.locale === "zh" ? "中文" : "English"}{ref ? ` · ${t("referenceUsed")}: ${ref.label}` : ""}</p><div className="exports">{["text", "image", "video", "json"].map((kind) => <a key={kind} href={`/api/reports/${report.id}/${kind}`} download>{t(kind)} <span aria-hidden="true">↓</span></a>)}</div></> : <><p className="muted">{t("exportPending")}</p><button disabled={!ready || generating || !!(ref && !ref.measurements)} onClick={() => void action(updateReport)}>{t("refreshExports")}</button></>}</div></details>
             </section>
-          </> : <div className="empty"><span className="mark" aria-hidden="true">↗</span><h1>{t("noShots")}</h1><p>{t("emptyHelp")}</p><div className="empty-method">{methodSelect}{mode !== "local" && <p className="mode-note">{t(modeReady ? mode === "astra_codex" ? "codexHint" : "apiHint" : modeProblem)}</p>}</div><button className="primary" disabled={!canStart} onClick={() => upload.current?.click()}>＋ {t("import")}</button></div>}
+          </> : <div className="empty"><span className="mark" aria-hidden="true">↗</span><h1>{t("noShots")}</h1><p>{t("emptyHelp")}</p><button className="primary" onClick={openSettings}>{t("settingsEmpty")} ↗</button></div>}
           {jobs.length > 0 && <details className="disclosure activity"><summary>{t("jobs")}{active && <span role="status">{t("analyzingOther")}</span>}</summary><div className="disclosure-body">{jobs.slice(0, 4).map((j) => <div className="job" key={j.id}><div className="job-heading"><strong>{t(j.status)}</strong><span>{t(j.stage)}</span><small>{j.completed ?? 0}{j.total ? ` / ${j.total}` : ""}</small></div>{j.status === "running" && j.stage === "pose_and_ball" && j.progress.total_frames && <progress aria-label={t(j.stage)} value={j.progress.frames || 0} max={j.progress.total_frames} />}{["running", "queued"].includes(j.status) && <button onClick={() => void action(async () => { await api(`/jobs/${j.id}/cancel`, post({})); })}>{t("cancel")}</button>}{j.error_code && <p className="notice">{t(j.error_code)}</p>}{j.errors.map((e, i) => <p className="notice" key={i}>{t(e.code)}</p>)}{j.receipts.length > 0 ? <p className="cost">{t("usage")}: {j.receipts.length} · {j.receipts.every((r) => r.cost.status === "subscription_usage") ? t("codexPlan") : j.receipts.some((r) => r.cost.estimated_usd === null) ? t("unknownCost") : `${t("estimated")} $${j.receipts.reduce((s, r) => s + (r.cost.estimated_usd || 0), 0).toFixed(5)}`}<small>{t(j.receipts.every((r) => r.cost.status === "subscription_usage") ? "codexHint" : "costScope")}</small></p> : <p className="cost">{t("localCost")}</p>}</div>)}</div></details>}
         </div>
       </main>
+      <dialog className="settings-dialog" id="settings-dialog" ref={settingsDialog} aria-labelledby="settings-title" aria-describedby="settings-description" onKeyDown={keepSettingsFocus} onCancel={(e) => { e.preventDefault(); closeSettings(); }} onClose={() => setSettingsOpen(false)} onClick={(e) => {
+        if (e.target !== e.currentTarget) return;
+        const bounds = e.currentTarget.getBoundingClientRect();
+        if (e.clientX < bounds.left || e.clientX > bounds.right || e.clientY < bounds.top || e.clientY > bounds.bottom) closeSettings();
+      }}>
+        <div className="settings-header"><div><span className="eyebrow">Shot Form Coach</span><h2 id="settings-title">{t("settingsTitle")}</h2><p id="settings-description">{t("settingsHelp")}</p></div><button className="settings-close" aria-label={t("closeSettings")} onClick={closeSettings} autoFocus>×</button></div>
+        <nav className="settings-nav" aria-label={t("settingsTitle")}>{["analysis", "import", "comparison", "playback", "language"].map((section) => <a key={section} href={`#settings-${section}`} onClick={(e) => { e.preventDefault(); document.getElementById(`settings-${section}`)?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }); }}>{t(`${section}Section`)}</a>)}</nav>
+        <div className="settings-body" ref={settingsBody}>
+          {error && settingsOpen && <div className="error" role="alert">{t(error)}</div>}
+          <section className="setting-section" id="settings-analysis" aria-labelledby="settings-analysis-title"><div className="setting-section-heading"><span>01</span><h3 id="settings-analysis-title">{t("analysisSection")}</h3></div><p className="settings-help">{t("nextAnalysis")}</p>
+            {methodSelect}<p className="settings-method-hint">{t(mode === "local" ? "methodHint" : mode === "astra_codex" ? "codexHint" : "apiHint")}</p>
+            {!modeReady && <p className="notice">{t(modeProblem)}</p>}
+            <details className="provider-help"><summary>{t("providers")}</summary><ul><li>Gemini · {t(health?.gemini_configured ? "providerReady" : "noKey")}</li><li>Astra / Codex · {t(health?.codex?.ready ? "providerReady" : health?.codex?.reason || "codex_not_installed")}</li><li>Astra / API · {t(health?.astra_api_configured ? "providerReady" : "openai_key_missing")}</li></ul></details>
+            <div className="settings-fields"><label>{t("hand")}<select value={hand} onChange={(e) => setHand(e.target.value)}>{["auto", "right", "left"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label><label>{t("view")}<select value={view} onChange={(e) => setView(e.target.value)}>{["oblique", "side", "front", "unknown"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label><label className="full-width">{t("shot")}<select value={shot} onChange={(e) => setShot(e.target.value)}>{["stationary_jump_shot", "set_shot", "unknown"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label></div>
+            {health?.models_ready === false && <p className="notice">{t("missingModels")}</p>}
+            {assets.length > 0 && <button className="batch-analysis" disabled={!canStart} onClick={() => void action(() => analyze(assets.map((a) => a.id))).then((success) => { if (success) closeSettings(); })}>{t("all")} · {assets.length}</button>}
+          </section>
+          <section className="setting-section" id="settings-import" aria-labelledby="settings-import-title"><div className="setting-section-heading"><span>02</span><h3 id="settings-import-title">{t("importSection")}</h3></div>
+            <p className="import-method-note">{t("importMethod")} <strong>{t(mode)}</strong></p>
+            <div className="import-option"><h4>{t("fromDevice")}</h4><p>{t("fromDeviceHelp")}</p>
+              <input type="file" accept="video/*" hidden ref={upload} onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void action(async () => {
+              const form = new FormData(); form.append("file", file);
+              const a = await api<Asset>("/assets/upload", { method: "POST", body: form });
+              setSelected(a.id); await analyze([a.id]);
+            }).then((success) => { if (success) closeSettings(); });
+            e.target.value = "";
+          }} />
+              <button className="primary" disabled={!canStart} onClick={() => upload.current?.click()}>＋ {t("uploadAnalyze")}</button><small>{t("uploadHint")}</small></div>
+            <div className="import-option workbench-option"><h4>{t("workbench")}</h4><p>{t("workbenchHelp")}</p><p className="workbench-when">{t("workbenchWhen")}</p>
+              {health?.workbench_configured === false ? <p className="settings-empty-state">{t("workbenchUnconfigured")}</p> : runsState === "loading" ? <p className="settings-empty-state" role="status">{t("workbenchLoading")}</p> : runsState === "error" ? <p className="settings-empty-state" role="status">{t("workbenchLoadError")}</p> : !runs.length ? <p className="settings-empty-state">{t("workbenchEmpty")}</p> : <div className="workbench"><label>{t("workbenchRun")}<select value={run} onChange={(e) => setRun(e.target.value)}>{runs.map((r) => <option key={r.id} value={r.id}>{r.id.slice(-8)} · {r.clip_count} {t("workbenchClips")}</option>)}</select></label><button disabled={!canStart || !run} onClick={() => void action(async () => { const imported = await api<Asset[]>("/workbench/import", post({ run_id: run })); if (imported.length) { setSelected(imported[0].id); await analyze(imported.map((item) => item.id)); } }).then((success) => { if (success) closeSettings(); })}>{t("importAnalyze")}</button></div>}
+              {health?.workbench_configured !== false && runsState !== "loading" && <button className="text-button" onClick={() => void loadRuns()}>{t("reloadRuns")}</button>}
+            </div>
+          </section>
+          <section className="setting-section" id="settings-comparison" aria-labelledby="settings-comparison-title"><div className="setting-section-heading"><span>03</span><h3 id="settings-comparison-title">{t("comparisonSection")}</h3></div>
+            {chosen ? <><p className="settings-help">{t("comparisonScope")} · <strong>{chosen.label}</strong></p><label>{t("comparator")}<select value={reference} onChange={(e) => { setReference(e.target.value); setSameView(false); }}><option value="">{t("noReference")}</option>{assets.filter((a) => a.id !== selected).map((a) => <option key={a.id} value={a.id}>{a.label}{!a.measurements ? ` · ${t("ready")}` : ""}</option>)}</select></label><p className="settings-help comparison-help">{t(assets.length < 2 ? "referenceMissing" : "comparisonNote")}</p>{reference && <label className="check"><input type="checkbox" checked={sameView} onChange={(e) => setSameView(e.target.checked)} />{t("sameView")}</label>}{ref && !ref.measurements && <p className="notice">{t("reference_unanalyzed")}</p>}{!reportMatches && report && <p className="notice">{t("comparisonDraft")}</p>}<button disabled={!ready || generating || !!(ref && !ref.measurements)} onClick={() => void action(updateReport).then((success) => { if (success) closeSettings(); })}>{t("compare")}</button></> : <p className="settings-empty-state">{t("comparisonEmpty")}</p>}
+          </section>
+          <section className="setting-section" id="settings-playback" aria-labelledby="settings-playback-title"><div className="setting-section-heading"><span>04</span><h3 id="settings-playback-title">{t("playbackSection")}</h3></div><p className="settings-help">{t("playbackHelp")}</p>
+            <label>{t("slow")}<select value={speed} onChange={(e) => setSpeed(e.target.value)}>{["0.25", "0.5", "1"].map((v) => <option key={v} value={v}>{v}×</option>)}</select></label>
+            <div className="settings-toggles"><label className="check"><input type="checkbox" checked={focused} onChange={(e) => setFocused(e.target.checked)} />{t("focus")}</label><label className="check"><input type="checkbox" checked={showPose} onChange={(e) => setShowPose(e.target.checked)} />{t("pose")}</label></div>
+          </section>
+          <section className="setting-section" id="settings-language" aria-labelledby="settings-language-title"><div className="setting-section-heading"><span>05</span><h3 id="settings-language-title">{t("languageSection")}</h3></div><p className="settings-help">{t("languageHelp")}</p><div className="language" role="group" aria-label={t("languageSection")}><button aria-pressed={lang === "en"} className={lang === "en" ? "selected" : ""} onClick={() => setLang("en")}>English</button><button aria-pressed={lang === "zh"} className={lang === "zh" ? "selected" : ""} onClick={() => setLang("zh")}>中文</button></div></section>
+        </div>
+        <div className="settings-footer"><span>{busy ? t("busy") : t("settingsSaved")}</span><button className="primary" onClick={closeSettings}>{t("doneSettings")}</button></div>
+      </dialog>
       <footer><span>{t("sourceMap")}</span><span>Shot Form Coach</span></footer>
     </>
   );

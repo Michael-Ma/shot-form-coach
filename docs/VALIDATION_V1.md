@@ -125,3 +125,17 @@ The permanent app instance was upgraded to V0.4 and all six existing reports wer
 All six rebuild jobs succeeded; each report's revision and every movie-frame source reference
 were checked, and all six newly rendered videos decoded end to end. The original clips and
 phase revisions were preserved. No remote model request was involved in that refresh.
+
+## Unified settings follow-up
+
+All configuration was moved into the top-right Settings drawer: analysis method, shooting
+context, imports, personal comparator, playback preferences and language. Workbench import
+now says “Import pre-cut shots” and explains that it reads completed Video Event Workbench
+exports with original video times. Main review content retains execution/playback actions
+and read-only context; configuration selectors appear only in the drawer.
+
+12 frontend interaction tests and the production build pass. Real Chrome checks at1440px and
+390px verified language switching, local preference persistence, internal drawer scrolling,
+no horizontal overflow, Escape/backdrop closing, focus return and first/last Tab wrapping.
+Changing settings generated no non-GET requests. Mocked tests cover Workbench states and
+upload-error recovery; no real clip was uploaded or sent to a model for this UI follow-up.

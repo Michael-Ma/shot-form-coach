@@ -53,8 +53,9 @@ comparators, sources, exports and activity/costs remain available in expandable 
 
 Local vision produces a clearly labelled **movement summary**. Gemini/Astra can additionally
 produce a bilingual **visual coaching review** using the supplied teaching rubric, measured
-context and input frames. The method selector sits beside the analysis button; the app remembers
-an explicit choice but never starts a remote request simply because a selection or page changes.
+context and input frames. Analysis, import, comparison, playback and language settings share the top-right Settings drawer.
+The page shows the selected method beside the analysis action. The app remembers an explicit
+choice but never starts a remote request simply because a selection or page changes.
 
 Current automatic priorities remain provisional. The system does not force three problems,
 assign a universal form score, claim measured Curry motion or diagnose the cause of a miss.
@@ -62,7 +63,10 @@ The teaching goals are server-controlled; the model cannot silently redefine the
 
 ## Try the workflow
 
-1. Import a clip or a Workbench run. Import automatically queues analysis using the selected
+1. Open **Settings** at the top right to choose the analysis method and import a clip.
+   **Import pre-cut shots** reads completed exports from Video Event Workbench and preserves
+   their original video times; it is a clip source, not another analysis model.
+   Import automatically queues analysis using the selected
    shooting hand, camera view, shot context, and analysis method.
 2. Inspect the body and ball candidates, release interval, and wrist-height curve. Toggle
    movement focus to see the full source frame.

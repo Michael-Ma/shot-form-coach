@@ -386,3 +386,81 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid va
   .no-priorities .practice-card h2 { font-size: 22px; }
 }
 .coaching-summary h2,.practice-card h2 { text-wrap: balance; }
+/* One settings surface: a top-right drawer leaves the review focused on the shot. */
+.settings-trigger { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; padding: 11px 16px; flex-shrink: 0; font-size: 13px; font-weight: 600; }
+.settings-trigger svg { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.review-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 9px 15px; max-width: 390px; }
+.analysis-method-summary { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.analysis-method-summary strong { color: #3f624a; font-weight: 500; }
+.review-actions .mode-note { flex-basis: 100%; text-align: right; }
+.playback-speed { font-size: 12px; color: var(--muted); min-width: 35px; text-align: right; white-space: nowrap; }
+.settings-dialog { position: fixed; inset: 0 0 0 auto; margin: 0; width: min(570px, 100%); max-width: 100%; height: 100dvh; max-height: 100dvh; padding: 0; border: 0; border-left: 1px solid var(--line); color: #243e33; background: var(--paper); box-shadow: -12px 0 60px #17281e24; overflow: hidden; }
+.settings-dialog[open] { display: flex; flex-direction: column; }
+.settings-dialog::backdrop { background: #1a2e2466; }
+.settings-header { display: flex; justify-content: space-between; gap: 20px; padding: 27px 28px 20px; flex-shrink: 0; }
+.settings-header .eyebrow { font-size: 10px; margin-bottom: 7px; letter-spacing: 1px; }
+.settings-header h2 { font-size: 27px; margin-bottom: 5px; }
+.settings-header p { font-size: 12px; color: var(--muted); margin-bottom: 0; }
+.settings-close { display: grid; place-items: center; align-self: flex-start; border: 0; background: #eef2e7; font-size: 25px; font-weight: 400; padding: 0; width: 44px; height: 44px; flex-shrink: 0; }
+.settings-nav { display: flex; gap: 5px; padding: 0 23px 17px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.settings-nav a { font-size: 12px; text-decoration: none; color: #536a55; padding: 10px 11px; border-radius: 6px; line-height: 1.3; }
+.settings-nav a:hover { background: var(--soft-green); color: var(--green); }
+.settings-body { overflow: auto; overscroll-behavior: contain; padding: 0 28px; flex: 1 1 auto; min-height: 0; scrollbar-gutter: stable; }
+.setting-section { padding: 26px 0 29px; border-bottom: 1px solid var(--line); scroll-margin-top: 15px; }
+.setting-section:last-child { border-bottom: 0; }
+.setting-section-heading { display: flex; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+.setting-section-heading > span { font-size: 11px; color: #7f8c75; font-variant-numeric: tabular-nums; }
+.setting-section-heading h3 { margin: 0; font-size: 18px; line-height: 1.5; }
+.settings-help { font-size: 12px; color: var(--muted); margin-bottom: 19px; line-height: 1.8; }
+.setting-section > .method-select { display: block; font-size: 13px; color: #345340; }
+.setting-section select { font-size: 14px; min-height: 44px; padding: 11px 12px; }
+.settings-method-hint { font-size: 12px; margin: 10px 0 12px; color: #66775f; }
+.setting-section .provider-help { border-radius: 6px; background: #f1f4e9; padding: 11px 13px; margin: 12px 0 21px; font-size: 12px; }
+.setting-section .provider-help ul { margin-bottom: 0; }
+.settings-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 17px; }
+.settings-fields .full-width { grid-column: 1/-1; }
+.batch-analysis { margin-top: 19px; font-size: 12px; background: transparent; }
+.import-method-note { font-size: 12px; color: var(--muted); margin-bottom: 21px; }
+.import-method-note strong { display: inline-block; color: var(--green); margin-left: 5px; font-weight: 600; }
+.import-option h4 { font-size: 14px; margin-bottom: 7px; }
+.import-option > p { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.9; }
+.import-option > button { font-size: 13px; min-height: 44px; }
+.import-option small { display: block; font-size: 11px; color: var(--muted); margin-top: 9px; }
+.workbench-option { margin-top: 25px; padding-top: 24px; border-top: 1px dashed var(--line); }
+.workbench-option > .workbench-when { font-size: 11px; color: #7a8471; }
+.settings-empty-state { font-size: 12px; color: #677561; line-height: 1.85; background: #f0f3e9; padding: 12px 14px; border-radius: 7px; }
+.setting-section .workbench { grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 16px; }
+.setting-section .workbench > button { justify-self: start; min-height: 44px; font-size: 13px; }
+.setting-section .comparison-help { margin: 11px 0 14px; }
+#settings-comparison > button { margin-top: 16px; font-size: 12px; }
+.settings-toggles { display: grid; gap: 8px; margin-top: 17px; }
+.settings-toggles .check { min-height: 36px; font-size: 13px; }
+.setting-section .language { width: fit-content; }
+.setting-section .language button { min-width: 99px; min-height: 40px; font-size: 13px; }
+.settings-footer { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; gap: 18px; border-top: 1px solid var(--line); background: #f5f7ef; padding: 17px 28px max(17px, env(safe-area-inset-bottom)); }
+.settings-footer > span { font-size: 11px; color: var(--muted); line-height: 1.7; }
+.settings-footer > button { min-height: 44px; font-size: 12px; white-space: nowrap; }
+.settings-body > .error { margin: 20px 0 0; }
+@media (max-width: 680px) {
+  .settings-trigger { padding: 10px 13px; font-size: 12px; }
+  .sidebar { display: block; }
+  .sidebar .section-title { justify-content: space-between; }
+  .shot-list { margin-bottom: 8px; }
+  .review-actions { margin-top: 13px; justify-content: space-between; max-width: none; gap: 9px; }
+  .review-actions .mode-note { text-align: left; }
+  .analysis-method-summary { font-size: 11px; }
+  .transport { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .settings-dialog { width: 100%; border-left: 0; }
+  .settings-header { padding: 22px 20px 16px; gap: 12px; }
+  .settings-header h2 { font-size: 26px; }
+  .settings-header p { font-size: 12px; }
+  .settings-nav { padding: 0 13px 12px; gap: 0; justify-content: space-between; }
+  .settings-nav a { font-size: 11px; padding: 12px 7px; min-height: 40px; }
+  .settings-body { padding: 0 20px; scrollbar-gutter: auto; }
+  .setting-section { padding: 24px 0; }
+  .settings-help,.settings-method-hint,.import-option > p { font-size: 12px; }
+  .settings-fields { gap: 15px 12px; }
+  .setting-section select { font-size: 14px; }
+  .settings-footer { padding: 14px 20px max(14px, env(safe-area-inset-bottom)); gap: 12px; }
+  .settings-footer > span { max-width: 180px; font-size: 11px; }
+}
