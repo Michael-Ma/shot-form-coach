@@ -1,7 +1,7 @@
 # Shot Form Coach
 
-A local basketball shooting review app with traceable movement measurements, optional
-phase correction, and written, image, and video reports. This is a separate project from
+A local basketball training-video library with editable shooting clips, traceable movement
+measurements, optional phase correction, and written, image, and video reports. This is a separate project from
 [Video Event Workbench](https://github.com/Michael-Ma/video-event-workbench).
 
 **Status: runnable engineering V1.** The local vision workflow has been exercised on six
@@ -63,22 +63,32 @@ The teaching goals are server-controlled; the model cannot silently redefine the
 
 ## Try the workflow
 
-1. Open **Settings** at the top right to choose the analysis method and import a clip.
-   **Import pre-cut shots** reads completed exports from Video Event Workbench and preserves
-   their original video times; it is a clip source, not another analysis model.
-   Import automatically queues analysis using the selected
-   shooting hand, camera view, shot context, and analysis method.
-2. Inspect the body and ball candidates, release interval, and wrist-height curve. Toggle
+1. Start in the video library and **import a full recording**. The original is retained locally;
+   a playable preview is prepared in the background. Existing Workbench batches and short clips
+   remain grouped by source. Import does not start a remote analysis.
+2. Open the recording to manage clips. Run the optional local candidate scan, review each proposed
+   range, or mark start/end times manually. Rename, trim, move clips to trash, and restore them.
+   A trim creates a new clip and retains the earlier version; its previous analysis is not reused
+   as if it described the new boundaries. Each saved clip is at most 30 seconds.
+3. Select the clips to analyze. Choose the method and recording context in the top-right
+   **Settings**, then start analysis. Settings also contains reference, playback and language
+   preferences, plus the optional import of previously cut Workbench clips.
+4. Open a clip's review. Inspect the body and ball candidates, release interval, and wrist-height curve. Toggle
    movement focus to see the full source frame.
-3. Optionally step to the last contact and first clear separation, select both, and save.
+5. Optionally step to the last contact and first clear separation, select both, and save.
    Corrections keep the original proposal, create a revision, and rebuild the report from
    cached tracks. An unknown interval remains unknown until evidence supports it.
-4. Select another analyzed shot as a personal comparator. Numerical differences require
+6. Select another analyzed shot as a personal comparator. Numerical differences require
    matching hand/context and a matching or explicitly assumed fixed camera view. A comparator
    supplies an attribute example; it is not automatically an ideal technique.
-5. Update the comparison to generate the current language's report. Download Markdown,
+7. Update the comparison to generate the current language's report. Download Markdown,
    comparison JPEG, 8-second H.264 slow-motion MP4, or the evidence JSON. Each movie frame
    records its source frame, timestamp, displayed relative time, and crop transformation.
+
+The local candidate scan is a navigation aid based on visible body movement. Its proposals need
+review, and missed shots can be added manually. It has not been validated to find every shot.
+Full recording uploads support up to 2 GB and 60 minutes; the 30-second limit applies to individual
+analysis clips. Sources and clips use separate original-video and clip-local timestamps.
 
 The interface supports English and Chinese. A release correction rebuilds exports in the
 current interface language; switching language alone preserves the existing exported report
@@ -94,6 +104,11 @@ not zero. The UI gives one practice hypothesis to test in a matched retake.
 A successful model review with no major correction is now shown separately from limited
 visibility, local-only measurements and a failed model request. Visible strengths remain
 available even when a local shooting-hand estimate limits some numerical measurements.
+
+Failures explain the evidence available: a disconnected model connection, explicit provider
+rejection, authentication/usage limit, timeout, or a response that failed evidence validation.
+An interrupted connection can leave remote usage unknown. It is not diagnosed as poor video
+quality or an empty successful review, and it does not trigger automatic resubmission.
 
 In **Settings → Comparison**, choose a pose target; enable the pose overlay in **Playback**.
 Orange is your measured pose and dashed green is the selected target. Use the release and

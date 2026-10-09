@@ -11,6 +11,7 @@ from .billing import estimate_call_cost, pricing_snapshot
 from .coaching import ModelCoaching, load_rubric, validate_model_coaching
 from .codex_runner import CodexCallInterrupted, call_codex, codex_status
 from .db import ident, now
+from .provider_diagnostics import classify_failure
 
 
 class ModelObservation(BaseModel):
@@ -271,16 +272,19 @@ def assist(settings, repo, job_id, asset, config, cancelled, transport=None):
             )
     except CodexCallInterrupted as exc:
         completed = exc.response.get("turn_completed", False)
+        diagnostic = exc.response.get("diagnostic") or classify_failure(code=exc.reason, source="codex_exit")
         receipt.update(
             response=exc.response,
             status="received_after_cancel" if completed else "request_unknown",
             cost=estimate_call_cost(snapshot, exc.response.get("usage", {}), outcome_unknown=not completed),
             interruption_reason=exc.reason,
+            diagnostic=diagnostic,
+            error_code=diagnostic["code"],
         )
         repo.patch("job", job_id, receipts=receipts)
         if exc.reason == "cancelled":
             raise InterruptedError("cancelled") from None
-        raise ValueError("request_unknown") from None
+        raise ValueError(diagnostic["code"]) from None
     except Exception as exc:
         status = getattr(exc, "code", None)
         if not isinstance(status, int):
@@ -297,11 +301,19 @@ def assist(settings, repo, job_id, asset, config, cancelled, transport=None):
             if rejected
             else "request_unknown"
         )
+        diagnostic = classify_failure(
+            f"{type(exc).__name__}: {exc}", code=code, http_status=status, source="provider_exception"
+        )
+        # Preserve a specific transport diagnosis while keeping uncertain calls
+        # blocked from resubmission until the user explicitly authorizes it.
+        if not rejected:
+            code = diagnostic["code"]
         receipt.update(
             status="provider_rejected" if rejected else "request_unknown",
             exception_type=type(exc).__name__,
             http_status=status,
             error_code=code,
+            diagnostic=diagnostic,
             cost=estimate_call_cost(snapshot, {}, outcome_unknown=not rejected),
         )
         repo.patch("job", job_id, receipts=receipts)
@@ -339,6 +351,8 @@ def assist(settings, repo, job_id, asset, config, cancelled, transport=None):
             }
     except (ValueError, TypeError):
         receipt["status"] = "validation_failed"
+        receipt["error_code"] = "model_reply_invalid"
+        receipt["diagnostic"] = classify_failure(code="model_reply_invalid", source="local_validation")
         repo.patch("job", job_id, receipts=receipts)
         raise ValueError("model_reply_invalid") from None
     receipt["status"] = "validated"

@@ -16,6 +16,14 @@ class MediaError(ValueError):
     pass
 
 
+def file_digest(path):
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as source:
+        while data := source.read(1024 * 1024):
+            digest.update(data)
+    return digest.hexdigest()
+
+
 def run(args, timeout=120):
     result = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
     if result.returncode:
@@ -58,10 +66,10 @@ def probe(path):
 
 
 def ingest(settings, repo, path: Path, filename: str, upstream=None, label=None):
-    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    digest = file_digest(path)
     upstream = upstream or {}
     for record in repo.all("asset"):
-        if record["sha256"] == digest and record.get("upstream") == upstream:
+        if record["sha256"] == digest and record.get("upstream") == upstream and not record.get("trashed_at"):
             return record
     stream, times, duration, raw_origin = probe(path)
     key = ident("shot")

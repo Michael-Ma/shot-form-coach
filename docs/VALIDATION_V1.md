@@ -165,3 +165,69 @@ and the failure state. Teaching mode draws only the demonstrated shooting arm; p
 uses the selected real shot. Screenshots were captured and viewed. No model POST/retry was
 made during this UI check. Newly drawn reference geometry is a visual teaching aid and is not
 validated motion-capture ground truth or a technical-fault threshold.
+
+## Full-video lifecycle and failure diagnosis (V0.6)
+
+The product flow is now video library → clip management → individual review. Importing a
+recording or editing boundaries does not queue a remote evaluation. Analysis is an explicit
+action on selected clips. Existing short clips are grouped by their import source.
+
+**111 backend tests and 34 frontend tests pass**, together with Ruff, TypeScript/Vite production
+build and an offline lockfile check. New coverage includes long-video upload/preview, HTTP range
+playback, nonzero-origin variable-frame-rate cutting, stale lifecycle forms, reversible trash,
+active-job guards, metadata edits retaining paid coaching, interrupted-job recovery, scan failure
+with manual fallback, cancellation, and explicit retry after an unknown network outcome. A long
+synthetic motion sequence also verifies that later candidates are not silently capped at 200.
+The pre-existing Starlette/httpx deprecation warning remains non-failing.
+
+A separate local snapshot of the 13 existing clips was used for browser verification. In Chrome,
+the 54.838-second original recording was uploaded through the new primary entry, prepared for
+playback, and used to save two manual clips. One clip was trimmed into a new identity, another
+was moved to trash and restored. A locally proposed range was previewed and saved as a third
+clip. Selecting only one clip produced one successful local-analysis job with no provider
+receipts. Its current Chinese report was regenerated locally, downloaded through the browser,
+and all four artifact types existed; the MP4 decoded end to end. The return path to the library
+and the real recent failure state were exercised.
+The scan was also cancelled through the visible processing control; all three saved QA clips
+remained available and the UI offered manual marking and another explicit scan.
+
+Desktop (1440px) and narrow mobile (390px) captures were inspected. Review moved the scan
+action into the first visible source-video area and removed a mobile sticky analysis bar that
+overlapped clip controls. The checked layouts have no horizontal overflow. Source labels,
+Chinese/English feedback, scoped processing/error states, and the boundary between global
+settings and a particular clip's comparison were checked. These are engineering and heuristic
+walkthroughs, not usability research with independent users; native 200% browser zoom was not tested.
+
+The local scan decoded 1,645 source frames, sampled 275 poses and proposed five wrist-rise
+intervals in approximately 12 seconds. It did not propose an interval for the earlier imported
+shot around source 13–15 seconds. This confirms the need for manual additions; it does not
+establish recall, precision, or complete coverage of shooting events. Sampling/processing
+coverage is recorded separately from event detection. Proposals are explicitly unconfirmed.
+
+### The two most recent visual-review failures
+
+The two requests at approximately 22:18 and 22:19 on October 8 (America/Los_Angeles) both
+logged `stream disconnected before completion: error sending request`. Both exited with code 1,
+without a completed turn, review text, or usage. The successful six-clip batch and these failures
+used the same Codex CLI version, 0.162.0-alpha.2. Failed inputs contained 66 and 52 frames,
+within the earlier successful 51–66-frame range. The output schema had changed, but the recorded
+errors contain no explicit schema rejection. A specific underlying network/provider cause
+cannot be established from these logs.
+
+One live synthetic text-only request using the production command and authentication succeeded
+in 4.263 seconds, returning a valid minimal JSON response (15,301 input tokens, 15 output tokens).
+This verifies current basic connectivity, not a full image request or shooting-review quality.
+No private footage was sent for this diagnostic check, and the failed private requests were not retried.
+
+New receipts retain safe specific diagnoses and request context. The two older failures are
+classified read-only from their local event logs; receipt history and unknown billing remain
+unchanged. The UI now says that the visual-model connection was interrupted, retains local
+measurements, and offers the existing explicit single-clip retry path. Coaching version v3
+prevents old generic-failure exports being presented as the current result.
+
+The installed application now runs at version 0.6.0 on its existing local address. A before/after
+comparison confirmed all 13 asset identities, source hashes, frame mappings, phase revisions
+and model-review records were preserved. Seven analyzed clips' reports were rebuilt solely
+from cached data; all jobs succeeded, every report matched its clip revision and v3 coaching,
+and all seven exported videos passed full decoding. The installed browser view reported no
+console errors or warnings.

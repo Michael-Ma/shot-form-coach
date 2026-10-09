@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import selectors
@@ -11,6 +12,8 @@ import subprocess
 import threading
 import time
 from pathlib import Path
+
+from .provider_diagnostics import classify_failure, event_failure
 
 _CACHE = {}
 _LOCK = threading.Lock()
@@ -153,7 +156,8 @@ def call_codex(settings, frames, config, context, schema, instruction):
         raise ValueError(status["reason"])
     folder = settings.data_dir / "receipts" / context["id"]
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / "schema.json").write_text(json.dumps(schema))
+    schema_text = json.dumps(schema)
+    (folder / "schema.json").write_text(schema_text)
     inputs = [{**frame, "absolute_path": str(settings.resolve(frame["path"]))} for frame in frames]
     manifest = [{k: f[k] for k in ("frame_id", "frame_index", "time_us", "source_time_us")} for f in frames]
     (folder / "input.json").write_text(json.dumps(manifest, indent=2))
@@ -187,6 +191,14 @@ def call_codex(settings, frames, config, context, schema, instruction):
         "auth_mode": "chatgpt",
         "cli_version": status["version"],
         "turn_completed": False,
+        "request_metadata": {
+            "cli_binary": status["binary"],
+            "frame_count": len(frames),
+            "schema_bytes": len(schema_text.encode()),
+            "schema_sha256": hashlib.sha256(schema_text.encode()).hexdigest(),
+            "transport": "responses_http",
+            "automatic_retries": 0,
+        },
     }
     start = time.monotonic()
     buffer = b""
@@ -198,17 +210,24 @@ def call_codex(settings, frames, config, context, schema, instruction):
             event = json.loads(line)
         except (ValueError, UnicodeDecodeError):
             return
+        if not isinstance(event, dict):
+            return
         kind = event.get("type")
         if kind == "thread.started":
             response["response_id"] = event.get("thread_id")
         elif kind == "item.completed":
-            item = event.get("item", {})
+            item = event.get("item") or {}
+            if not isinstance(item, dict):
+                return
             if item.get("type") == "agent_message":
                 response["text"] = item.get("text", "")
         elif kind == "turn.completed":
             response.update(usage=event.get("usage") or {}, turn_completed=True)
         elif kind in ("turn.failed", "error"):
             response["provider_error"] = True
+            diagnostic = event_failure(event)
+            if diagnostic and (not response.get("diagnostic") or diagnostic["category"] != "unknown"):
+                response["diagnostic"] = diagnostic
         # Keep received usage even if cancellation or a malformed final file follows.
         context["on_progress"](dict(response))
 
@@ -236,7 +255,9 @@ def call_codex(settings, frames, config, context, schema, instruction):
         output = folder / "reply.json"
         if output.exists():
             response["text"] = output.read_text()
-        if not response["turn_completed"] and process.returncode:
+        response["elapsed_ms"] = round((time.monotonic() - start) * 1000)
+        if not response["turn_completed"]:
+            response.setdefault("diagnostic", classify_failure(code="codex_call_failed", source="codex_exit"))
             raise CodexCallInterrupted("codex_call_failed", response)
         return response
     finally:

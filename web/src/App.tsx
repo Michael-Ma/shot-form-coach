@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import Lifecycle, { lifecycleText, videoLabel, type TrainingVideo, type ManagedClip, type LifecycleJob } from "./Lifecycle";
 import { PoseComparisonGuide, PoseLegend, TargetPose, type PoseComparison, type ComparisonFrame, type ComparisonMode } from "./PoseComparison";
 
 type Bilingual = { en: string; zh: string };
@@ -70,7 +71,7 @@ type Report = {
   };
   sources: { id: string; url: string; title?: string }[];
 };
-type Asset = {
+type Asset = Omit<ManagedClip, "frame_index"> & {
   id: string;
   label: string;
   revision: number;
@@ -93,6 +94,7 @@ type Asset = {
   report: Report | null;
   report_request?: { reference_asset_id?: string; assume_same_view?: boolean };
   model_error?: string;
+  model_diagnostic?: { outcome_unknown?: boolean; analysis_mode?: string };
   analysis_config?: { mode: string };
   model_assist?: {
     asset_revision?: number;
@@ -104,7 +106,7 @@ type Asset = {
     }[];
   };
 };
-type Job = {
+type Job = LifecycleJob & {
   id: string;
   kind: string;
   status: string;
@@ -707,6 +709,9 @@ const REVIEW_ZH: Record<string, string> = {
   referenceUsed: "使用的参照", loadingShots: "正在加载你的投篮…", setup: "需要配置", exportsLanguage: "已保存报告语言",
 };
 const SETTINGS_EN: Record<string, string> = {
+  upload_too_large: "The training video exceeds 2 GB.", video_too_long: "Choose a training video no longer than 60 minutes.", invalid_video: "This video could not be read. Try exporting it as MP4 or MOV.", video_duration_unknown: "The video duration could not be read. Try another video export.", video_metadata_timeout: "Reading the video took too long. Try another export.", preview_timeout: "Preparing the preview took too long. Retry or use a shorter video.", video_processing_failed: "The preview could not be prepared. Retry or use another video export.", no_frames_in_range: "No frames were found in this range. Adjust the start and end.", clip_frame_span_exceeds_30_seconds: "The selected frames exceed 30 seconds. Shorten the clip slightly.", stale_lifecycle_revision: "This clip was changed elsewhere. Refresh and try again.", candidate_not_proposed: "This candidate was already handled. Refresh the video to see the current list.", invalid_request: "Check the selected clips and entered values, then try again.",
+  provider_network_error: "The model service could not be reached. Check the connection before submitting again; the previous request outcome is unknown.", provider_timeout: "The model request timed out. Its outcome is unknown; check before submitting again.", provider_service_error: "The model service returned an error. The request outcome is unknown.",
+  asset_busy: "This clip is being processed. Try editing it when processing finishes.", asset_trashed: "This clip is in Trash. Restore it before continuing.", range_outside_source: "Keep the clip inside the original video.", range_outside_available_clip: "This imported clip can only be shortened within its existing boundaries.", video_not_ready: "Wait for the video preview to finish preparing.", pose_model_missing: "The local pose model is missing. Manual marking is still available.", invalid_or_long_source_video: "Choose a readable video no longer than 60 minutes.", source_upload_too_large: "The training video exceeds 2 GB.", video_import: "Preparing video", video_scan: "Finding candidates", finding_candidates: "Finding candidates", preparing_video: "Preparing video", scanning_video: "Finding candidates",
   confirmUnknownRetry: "Confirm in Settings whether to submit this shot again.",
   retryUnknown: "The last result is unknown. Allow resubmitting this shot (a new model charge may apply).",
   provider_bad_request: "The model rejected the request format. Update the app before trying again.", provider_auth_error: "The model could not authenticate. Check the configured account or API key.", provider_model_unavailable: "This model is not available to the configured account.", provider_rate_limited: "The provider's usage or rate limit was reached. Try again after it resets.", provider_rejected: "The model provider rejected this request.",
@@ -718,7 +723,7 @@ const SETTINGS_EN: Record<string, string> = {
   coordinated_rise: "Rise and ball lift", balanced_landing: "Balance and landing", comfortable_release: "Release and extension", quiet_guide_hand: "Support-hand release", relaxed_finish: "Finish",
   aligned: "Teaching goal observed", needs_review: "Needs attention", not_visible: "Not visible", uncertain: "Uncertain",
   reviewCoverage: "What was reviewed", issue_found: "Focus identified", no_issue_observed: "No issue observed", not_assessed: "Not assessed", insufficient_evidence: "Evidence limited",
-  settingsTitle: "Settings", settingsHelp: "Everything you need for your next review.", closeSettings: "Close settings", doneSettings: "Back to review",
+  settingsTitle: "Settings", settingsHelp: "Everything you need for your next review.", closeSettings: "Close settings", doneSettings: "Done",
   analysisSection: "Analysis", importSection: "Add shots", comparisonSection: "Comparison", playbackSection: "Playback", languageSection: "Language",
   nextAnalysis: "These choices apply when you next analyze. Changing a setting does not rerun a review.",
   selectedMethod: "Next analysis", configureAnalysis: "Choose in Settings", uploadAnalyze: "Choose a video & analyze", importAnalyze: "Import & analyze",
@@ -729,11 +734,14 @@ const SETTINGS_EN: Record<string, string> = {
   workbenchEmpty: "No completed runs with clips are available yet.", workbenchLoading: "Checking completed Workbench runs…", workbenchLoadError: "Could not load Workbench runs. Try again.", reloadRuns: "Check again",
   settingsSaved: "Preferences are saved in this browser.", playbackHelp: "These preferences apply immediately to the video preview.",
   languageHelp: "Changes the interface and the language used for your next report export.",
-  comparisonScope: "For the selected shot", comparisonEmpty: "Add a shot first, then choose a personal reference here.",
+  comparisonScope: "For the selected shot", comparisonEmpty: "Open a clip review to choose its personal reference and update its comparison.",
   referenceMissing: "Add another shot to compare your movement.", noReferenceHelp: "Choose a reference in Settings to view your shots side by side.",
   settingsEmpty: "Open Settings to add your first shot", playbackNow: "Playback", comparisonResults: "Personal comparison",
 };
 const SETTINGS_ZH: Record<string, string> = {
+  upload_too_large: "训练视频超过 2 GB。", video_too_long: "请选择 60 分钟以内的训练视频。", invalid_video: "无法读取视频，请尝试重新导出为 MP4 或 MOV。", video_duration_unknown: "无法读取视频时长，请尝试重新导出。", video_metadata_timeout: "读取视频信息耗时过长，请尝试重新导出。", preview_timeout: "视频预览准备超时，可以重试或改用更短的视频。", video_processing_failed: "无法准备视频预览，请重试或使用重新导出的视频。", no_frames_in_range: "所选区间内没有可用画面，请调整开始和结束。", clip_frame_span_exceeds_30_seconds: "所选画面超过 30 秒，请稍微缩短片段。", stale_lifecycle_revision: "片段已被其他操作修改，请刷新后重试。", candidate_not_proposed: "这个候选已处理，请刷新视频查看当前列表。", invalid_request: "请检查所选片段和输入的数值后重试。",
+  provider_network_error: "未能连接模型服务。重新提交前请检查网络；上次请求结果仍未知。", provider_timeout: "模型请求超时，结果仍未知；请确认后再提交。", provider_service_error: "模型服务返回错误，请求结果仍未知。",
+  asset_busy: "片段正在处理中，完成后可继续编辑。", asset_trashed: "片段位于回收站，请先恢复。", range_outside_source: "片段范围须在原视频内。", range_outside_available_clip: "已导入片段只能在现有边界内缩短。", video_not_ready: "请等待视频预览准备完成。", pose_model_missing: "缺少本地姿态模型，仍可手动标记片段。", invalid_or_long_source_video: "请选择可读取、60 分钟以内的视频。", source_upload_too_large: "训练视频超过 2 GB。", video_import: "准备视频", video_scan: "查找候选", finding_candidates: "查找候选", preparing_video: "准备视频", scanning_video: "查找候选",
   confirmUnknownRetry: "请在设置中确认是否再次提交这球。",
   retryUnknown: "上次结果未知，允许再次提交这球（可能产生新的调用费用）。",
   provider_bad_request: "模型服务拒绝了请求格式，请更新应用后再尝试。", provider_auth_error: "模型认证失败，请检查所配置的账号或 API key。", provider_model_unavailable: "当前账号无法使用这个模型。", provider_rate_limited: "已达到模型服务的额度或频率限制，请恢复后再试。", provider_rejected: "模型服务拒绝了这次请求。",
@@ -745,7 +753,7 @@ const SETTINGS_ZH: Record<string, string> = {
   coordinated_rise: "起身与举球衔接", balanced_landing: "平衡与落地", comfortable_release: "出手与伸展", quiet_guide_hand: "辅助手离球", relaxed_finish: "随挥与收势",
   aligned: "观察到教学目标", needs_review: "值得关注", not_visible: "看不清", uncertain: "尚不确定",
   reviewCoverage: "本次观察范围", issue_found: "发现调整方向", no_issue_observed: "未见明显问题", not_assessed: "尚未评估", insufficient_evidence: "证据不足",
-  settingsTitle: "设置", settingsHelp: "下一次复盘需要的选项，都在这里。", closeSettings: "关闭设置", doneSettings: "回到复盘",
+  settingsTitle: "设置", settingsHelp: "下一次复盘需要的选项，都在这里。", closeSettings: "关闭设置", doneSettings: "完成",
   analysisSection: "分析", importSection: "添加投篮", comparisonSection: "对比", playbackSection: "播放", languageSection: "语言",
   nextAnalysis: "这些选项用于下一次分析。修改设置不会自动重新分析。",
   selectedMethod: "下次分析", configureAnalysis: "在设置中选择", uploadAnalyze: "选择视频并分析", importAnalyze: "导入并分析",
@@ -756,7 +764,7 @@ const SETTINGS_ZH: Record<string, string> = {
   workbenchEmpty: "暂时没有包含投篮片段的已完成任务。", workbenchLoading: "正在查找已完成的 Workbench 任务…", workbenchLoadError: "暂时无法读取 Workbench 任务，请重试。", reloadRuns: "重新查找",
   settingsSaved: "偏好设置已保存在当前浏览器。", playbackHelp: "这些选项会立即应用到视频预览。",
   languageHelp: "切换界面语言，同时用于下一次生成的报告。",
-  comparisonScope: "用于当前投篮", comparisonEmpty: "添加投篮后，可在这里选择自己的参照球。",
+  comparisonScope: "用于当前投篮", comparisonEmpty: "先打开某个片段的复盘，再为这球选择个人参照并更新对比。",
   referenceMissing: "再添加一球，就可以比较自己的动作。", noReferenceHelp: "在设置中选择参照球，可并排回看自己的动作。",
   settingsEmpty: "打开设置，添加第一球", playbackNow: "播放", comparisonResults: "个人动作对比",
 };
@@ -784,6 +792,10 @@ export default function App() {
   const t = (k: string) => (lang === "zh" ? SETTINGS_ZH : SETTINGS_EN)[k] || (lang === "zh" ? REVIEW_ZH : REVIEW_EN)[k] || (lang === "zh" ? ZH : EN)[k] || EN[k] || k;
   const cText = (value: Bilingual | undefined) => value ? value[lang === "zh" ? "zh" : "en"] || value.en || "" : "";
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [videos, setVideos] = useState<TrainingVideo[]>([]);
+  const [screen, setScreen] = useState<"library" | "clips" | "review">("library");
+  const [videoId, setVideoId] = useState("");
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const [selected, setSelected] = useState("");
   const [tracks, setTracks] = useState<TrackFrame[]>([]);
   const [refTracks, setRefTracks] = useState<TrackFrame[]>([]);
@@ -840,7 +852,6 @@ export default function App() {
   }
   const [evidenceLabel, setEvidenceLabel] = useState("");
   const video = useRef<HTMLVideoElement>(null);
-  const upload = useRef<HTMLInputElement>(null);
   const evidenceSection = useRef<HTMLElement>(null);
   const summarySection = useRef<HTMLElement>(null);
   const chosen = assets.find((a) => a.id === selected);
@@ -852,7 +863,7 @@ export default function App() {
   const report = chosen?.report;
   const coaching = chosen?.coaching || (report?.asset_revision === chosen?.revision ? report?.coaching : undefined);
   const hasVisualReview = coaching?.assessment_source === "model";
-  const unknownRetryAvailable = !!chosen?.model_error && ["request_unknown", "unresolved_request_blocks_resubmission", "interrupted_request_unknown"].includes(chosen.model_error) && mode === chosen.analysis_config?.mode;
+  const unknownRetryAvailable = screen === "review" && !!chosen?.model_error && (!!chosen.model_diagnostic?.outcome_unknown || ["request_unknown", "unresolved_request_blocks_resubmission", "interrupted_request_unknown"].includes(chosen.model_error)) && mode === (chosen.model_diagnostic?.analysis_mode || chosen.analysis_config?.mode);
   const issues = [...(coaching?.issues || [])].sort((a, b) => a.rank - b.rank).slice(0, 3);
   const reviewOutcome = coaching?.outcome || (chosen?.model_error ? "model_failed" : issues.length ? "issues_found" : hasVisualReview && coaching?.status === "reviewed" ? "no_priority_issue" : coaching?.status === "limited" ? "limited_visibility" : !hasVisualReview ? "measurements_only" : "limited_visibility");
   const emptyTitle = cText(coaching?.empty_state?.title) || t(reviewOutcome === "no_priority_issue" ? "noPriorityIssue" : reviewOutcome === "model_failed" ? "modelFailedTitle" : reviewOutcome === "measurements_only" ? "measurementsOnlyTitle" : "noIssues");
@@ -864,8 +875,8 @@ export default function App() {
   const exportMatches = reportMatches && report?.locale === lang && !!report?.coaching && report.coaching.version === coaching?.version;
   const validSave = last !== null && first !== null && last <= first;
   async function refresh() {
-    const [a, j] = await Promise.all([api<Asset[]>("/assets"), api<Job[]>("/jobs")]);
-    setAssets(a); setJobs(j); setLoaded(true);
+    const [a, j, v] = await Promise.all([api<Asset[]>("/assets"), api<Job[]>("/jobs"), api<TrainingVideo[]>("/videos")]);
+    setAssets(a); setJobs(j); setVideos(v); setLoaded(true); setRefreshVersion((value) => value + 1);
     setSelected((s) => a.some((v) => v.id === s) ? s : a[a.length - 1]?.id || "");
   }
   useEffect(() => {
@@ -983,17 +994,28 @@ export default function App() {
   const methodSelect = <label className="method-select">{t("mode")}<select value={mode} onChange={(e) => setMode(e.target.value)} disabled={generating}>
     <option value="local">{t("local")}</option><option value="gemini" disabled={!health?.gemini_configured}>{t("gemini")}{!health?.gemini_configured ? ` · ${t("setup")}` : ""}</option><option value="astra_codex" disabled={!health?.codex?.ready}>{t("astra_codex")}{!health?.codex?.ready ? ` · ${t("setup")}` : ""}</option><option value="astra_api" disabled={!health?.astra_api_configured}>{t("astra_api")}{!health?.astra_api_configured ? ` · ${t("setup")}` : ""}</option>
   </select></label>;
+  const legacyImport = <div className="import-option workbench-option"><h4>{t("workbench")}</h4><p>{t("workbenchHelp")}</p><p className="workbench-when">{t("workbenchWhen")}</p>
+              {health?.workbench_configured === false ? <p className="settings-empty-state">{t("workbenchUnconfigured")}</p> : runsState === "loading" ? <p className="settings-empty-state" role="status">{t("workbenchLoading")}</p> : runsState === "error" ? <p className="settings-empty-state" role="status">{t("workbenchLoadError")}</p> : !runs.length ? <p className="settings-empty-state">{t("workbenchEmpty")}</p> : <div className="workbench"><label>{t("workbenchRun")}<select value={run} onChange={(e) => setRun(e.target.value)}>{runs.map((r) => <option key={r.id} value={r.id}>{r.id.slice(-8)} · {r.clip_count} {t("workbenchClips")}</option>)}</select></label><button disabled={busy || !run} onClick={() => void action(async () => { const imported = await api<Asset[]>("/workbench/import", post({ run_id: run })); if (imported.length) { setSelected(imported[0].id); if (imported[0].session_id) { setVideoId(imported[0].session_id); setScreen("clips"); } } })}>{lang === "zh" ? "导入片段" : "Import clips"}</button></div>}
+              {health?.workbench_configured !== false && runsState !== "loading" && <button className="text-button" onClick={() => void loadRuns()}>{t("reloadRuns")}</button>}
+            </div>;
+  const sessionAssets = assets.filter((asset) => !videoId || asset.session_id === videoId);
+  const sessionVideo = videos.find((item) => item.id === videoId);
+  const sessionLabel = sessionVideo ? videoLabel(sessionVideo, lang) : "";
+  function openVideo(id: string) { video.current?.pause(); setPlaying(false); setVideoId(id); setScreen("clips"); }
+  function openReview(asset: ManagedClip) { setSelected(asset.id); setVideoId(asset.session_id || videoId); setScreen("review"); window.scrollTo?.({ top: 0 }); }
   return (
     <>
       <header className="app-header">
-        <a className="brand" href="/"><span className="mark" aria-hidden="true">↗</span><div><strong>{t("title")}</strong><small>{t("subtitle")}</small></div></a>
+        <a className="brand" href="/" onClick={(event) => { event.preventDefault(); setScreen("library"); setVideoId(""); video.current?.pause(); }}><span className="mark" aria-hidden="true">↗</span><div><strong>{t("title")}</strong><small>{t("subtitle")}</small></div></a>
         <button className="settings-trigger" ref={settingsTrigger} onClick={openSettings} aria-haspopup="dialog" aria-expanded={settingsOpen} aria-controls="settings-dialog"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M4 17h16M8 4v6M16 14v6" /></svg><span>{t("settingsTitle")}</span></button>
       </header>
-      <main>
+      {screen === "review" && <nav className="workflow-breadcrumb" aria-label={lang === "zh" ? "当前流程" : "Current workflow"}><button onClick={() => { setScreen("library"); setVideoId(""); }}>{lifecycleText(lang, "library")}</button><span>/</span><button onClick={() => openVideo(videoId)}>{sessionLabel || lifecycleText(lang, "stepClips")}</button><span>/</span><strong>{chosen?.label}</strong></nav>}
+      {screen !== "review" ? <main className="lifecycle-main"><div className="lifecycle-shell">{error && !settingsOpen && <div className="error" role="alert">{t(error)}</div>}<Lifecycle lang={lang} videos={videos} assets={assets} videoId={screen === "clips" ? videoId : ""} loaded={loaded} busy={busy} active={active} jobs={jobs} refreshVersion={refreshVersion} modeLabel={t(mode)} canAnalyze={canStart} analysisProblem={!modeReady ? t(modeProblem) : health?.models_ready === false ? t("missingModels") : active ? t("analyzingOther") : undefined} remoteMode={mode !== "local"} onOpenVideo={openVideo} onBack={() => { setScreen("library"); setVideoId(""); }} onReview={openReview} onSettings={openSettings} run={action} onAnalyze={(ids) => action(() => analyze(ids))} legacyImport={legacyImport} tStatus={t} /></div></main> : <main>
         <aside className="sidebar" aria-label={t("session")}>
-          <div className="section-title"><h2>{t("session")}</h2><span className="count">{assets.length}</span></div>
+          <div className="section-title"><h2>{lifecycleText(lang, "organized")}</h2><span className="count">{sessionAssets.length}</span></div>
+          <button className="text-button manage-from-review" onClick={() => openVideo(videoId)}>← {lifecycleText(lang, "stepClips")}</button>
           <nav className="shot-list" aria-label={t("session")}>
-            {assets.slice().reverse().map((a) => <button className={`shot ${selected === a.id ? "current" : ""}`} aria-current={selected === a.id ? "true" : undefined} key={a.id} onClick={() => setSelected(a.id)}>
+            {sessionAssets.slice().reverse().map((a) => <button className={`shot ${selected === a.id ? "current" : ""}`} aria-current={selected === a.id ? "true" : undefined} key={a.id} onClick={() => openReview(a)}>
               <img src={`/api/assets/${a.id}/frames/${Math.max(0, Math.min(10, a.frame_index.length - 1))}`} alt="" loading="lazy" />
               <span><strong>{a.label}</strong><small>{t(a.status)} · {(a.duration_us / 1e6).toFixed(1)}s</small></span>
               {selected === a.id && <span className="shot-arrow" aria-hidden="true">↗</span>}
@@ -1049,14 +1071,14 @@ export default function App() {
           </> : <div className="empty"><span className="mark" aria-hidden="true">↗</span><h1>{t("noShots")}</h1><p>{t("emptyHelp")}</p><button className="primary" onClick={openSettings}>{t("settingsEmpty")} ↗</button></div>}
           {jobs.length > 0 && <details className="disclosure activity"><summary>{t("jobs")}{active && <span role="status">{t("analyzingOther")}</span>}</summary><div className="disclosure-body">{jobs.slice(0, 4).map((j) => <div className="job" key={j.id}><div className="job-heading"><strong>{t(j.status)}</strong><span>{t(j.stage)}</span><small>{j.completed ?? 0}{j.total ? ` / ${j.total}` : ""}</small></div>{j.status === "running" && j.stage === "pose_and_ball" && j.progress.total_frames && <progress aria-label={t(j.stage)} value={j.progress.frames || 0} max={j.progress.total_frames} />}{["running", "queued"].includes(j.status) && <button onClick={() => void action(async () => { await api(`/jobs/${j.id}/cancel`, post({})); })}>{t("cancel")}</button>}{j.error_code && <p className="notice">{t(j.error_code)}</p>}{j.errors.map((e, i) => <p className="notice" key={i}>{t(e.code)}</p>)}{j.receipts.length > 0 ? <p className="cost">{t("usage")}: {j.receipts.length} · {j.receipts.every((r) => r.cost.status === "subscription_usage") ? t("codexPlan") : j.receipts.some((r) => r.cost.estimated_usd === null) ? t("unknownCost") : `${t("estimated")} $${j.receipts.reduce((s, r) => s + (r.cost.estimated_usd || 0), 0).toFixed(5)}`}<small>{t(j.receipts.every((r) => r.cost.status === "subscription_usage") ? "codexHint" : "costScope")}</small></p> : <p className="cost">{t("localCost")}</p>}</div>)}</div></details>}
         </div>
-      </main>
+      </main>}
       <dialog className="settings-dialog" id="settings-dialog" ref={settingsDialog} aria-labelledby="settings-title" aria-describedby="settings-description" onKeyDown={keepSettingsFocus} onCancel={(e) => { e.preventDefault(); closeSettings(); }} onClose={() => setSettingsOpen(false)} onClick={(e) => {
         if (e.target !== e.currentTarget) return;
         const bounds = e.currentTarget.getBoundingClientRect();
         if (e.clientX < bounds.left || e.clientX > bounds.right || e.clientY < bounds.top || e.clientY > bounds.bottom) closeSettings();
       }}>
         <div className="settings-header"><div><span className="eyebrow">Shot Form Coach</span><h2 id="settings-title">{t("settingsTitle")}</h2><p id="settings-description">{t("settingsHelp")}</p></div><button className="settings-close" aria-label={t("closeSettings")} onClick={closeSettings} autoFocus>×</button></div>
-        <nav className="settings-nav" aria-label={t("settingsTitle")}>{["analysis", "import", "comparison", "playback", "language"].map((section) => <a key={section} href={`#settings-${section}`} onClick={(e) => { e.preventDefault(); document.getElementById(`settings-${section}`)?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }); }}>{t(`${section}Section`)}</a>)}</nav>
+        <nav className="settings-nav" aria-label={t("settingsTitle")}>{["analysis", "comparison", "playback", "language"].map((section) => <a key={section} href={`#settings-${section}`} onClick={(e) => { e.preventDefault(); document.getElementById(`settings-${section}`)?.scrollIntoView({ behavior: scrollBehavior(), block: "start" }); }}>{t(`${section}Section`)}</a>)}</nav>
         <div className="settings-body" ref={settingsBody}>
           {error && settingsOpen && <div className="error" role="alert">{t(error)}</div>}
           <section className="setting-section" id="settings-analysis" aria-labelledby="settings-analysis-title"><div className="setting-section-heading"><span>01</span><h3 id="settings-analysis-title">{t("analysisSection")}</h3></div><p className="settings-help">{t("nextAnalysis")}</p>
@@ -1066,35 +1088,16 @@ export default function App() {
             <details className="provider-help"><summary>{t("providers")}</summary><ul><li>Gemini · {t(health?.gemini_configured ? "providerReady" : "noKey")}</li><li>Astra / Codex · {t(health?.codex?.ready ? "providerReady" : health?.codex?.reason || "codex_not_installed")}</li><li>Astra / API · {t(health?.astra_api_configured ? "providerReady" : "openai_key_missing")}</li></ul></details>
             <div className="settings-fields"><label>{t("hand")}<select value={hand} onChange={(e) => setHand(e.target.value)}>{["auto", "right", "left"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label><label>{t("view")}<select value={view} onChange={(e) => setView(e.target.value)}>{["oblique", "side", "front", "unknown"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label><label className="full-width">{t("shot")}<select value={shot} onChange={(e) => setShot(e.target.value)}>{["stationary_jump_shot", "set_shot", "unknown"].map((v) => <option key={v} value={v}>{t(v)}</option>)}</select></label></div>
             {health?.models_ready === false && <p className="notice">{t("missingModels")}</p>}
-            {assets.length > 0 && <button className="batch-analysis" disabled={!canStart} onClick={() => void action(() => analyze(assets.map((a) => a.id))).then((success) => { if (success) closeSettings(); })}>{t("all")} · {assets.length}</button>}
           </section>
-          <section className="setting-section" id="settings-import" aria-labelledby="settings-import-title"><div className="setting-section-heading"><span>02</span><h3 id="settings-import-title">{t("importSection")}</h3></div>
-            <p className="import-method-note">{t("importMethod")} <strong>{t(mode)}</strong></p>
-            <div className="import-option"><h4>{t("fromDevice")}</h4><p>{t("fromDeviceHelp")}</p>
-              <input type="file" accept="video/*" hidden ref={upload} onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) void action(async () => {
-              const form = new FormData(); form.append("file", file);
-              const a = await api<Asset>("/assets/upload", { method: "POST", body: form });
-              setSelected(a.id); await analyze([a.id]);
-            }).then((success) => { if (success) closeSettings(); });
-            e.target.value = "";
-          }} />
-              <button className="primary" disabled={!canStart} onClick={() => upload.current?.click()}>＋ {t("uploadAnalyze")}</button><small>{t("uploadHint")}</small></div>
-            <div className="import-option workbench-option"><h4>{t("workbench")}</h4><p>{t("workbenchHelp")}</p><p className="workbench-when">{t("workbenchWhen")}</p>
-              {health?.workbench_configured === false ? <p className="settings-empty-state">{t("workbenchUnconfigured")}</p> : runsState === "loading" ? <p className="settings-empty-state" role="status">{t("workbenchLoading")}</p> : runsState === "error" ? <p className="settings-empty-state" role="status">{t("workbenchLoadError")}</p> : !runs.length ? <p className="settings-empty-state">{t("workbenchEmpty")}</p> : <div className="workbench"><label>{t("workbenchRun")}<select value={run} onChange={(e) => setRun(e.target.value)}>{runs.map((r) => <option key={r.id} value={r.id}>{r.id.slice(-8)} · {r.clip_count} {t("workbenchClips")}</option>)}</select></label><button disabled={!canStart || !run} onClick={() => void action(async () => { const imported = await api<Asset[]>("/workbench/import", post({ run_id: run })); if (imported.length) { setSelected(imported[0].id); await analyze(imported.map((item) => item.id)); } }).then((success) => { if (success) closeSettings(); })}>{t("importAnalyze")}</button></div>}
-              {health?.workbench_configured !== false && runsState !== "loading" && <button className="text-button" onClick={() => void loadRuns()}>{t("reloadRuns")}</button>}
-            </div>
-          </section>
-          <section className="setting-section" id="settings-comparison" aria-labelledby="settings-comparison-title"><div className="setting-section-heading"><span>03</span><h3 id="settings-comparison-title">{t("comparisonSection")}</h3></div>
+          <section className="setting-section" id="settings-comparison" aria-labelledby="settings-comparison-title"><div className="setting-section-heading"><span>02</span><h3 id="settings-comparison-title">{t("comparisonSection")}</h3></div>
             <label>{t("poseTarget")}<select value={poseMode} onChange={(e) => setPoseMode(e.target.value as ComparisonMode)}><option value="none">{t("poseNone")}</option><option value="teaching">{t("poseTeaching")}</option><option value="reference">{t("poseReference")}</option></select></label><p className="settings-help comparison-help">{t("poseTargetHelp")}</p>
-            {chosen ? <><p className="settings-help">{t("comparisonScope")} · <strong>{chosen.label}</strong></p><label>{t("comparator")}<select value={reference} onChange={(e) => { setReference(e.target.value); setSameView(false); }}><option value="">{t("noReference")}</option>{assets.filter((a) => a.id !== selected).map((a) => <option key={a.id} value={a.id}>{a.label}{!a.measurements ? ` · ${t("ready")}` : ""}</option>)}</select></label><p className="settings-help comparison-help">{t(assets.length < 2 ? "referenceMissing" : "comparisonNote")}</p>{reference && <label className="check"><input type="checkbox" checked={sameView} onChange={(e) => setSameView(e.target.checked)} />{t("sameView")}</label>}{ref && !ref.measurements && <p className="notice">{t("reference_unanalyzed")}</p>}{!reportMatches && report && <p className="notice">{t("comparisonDraft")}</p>}<button disabled={!ready || generating || !!(ref && !ref.measurements)} onClick={() => void action(updateReport).then((success) => { if (success) closeSettings(); })}>{t("compare")}</button></> : <p className="settings-empty-state">{t("comparisonEmpty")}</p>}
+            {chosen && screen === "review" ? <><p className="settings-help">{t("comparisonScope")} · <strong>{sessionLabel} · {chosen.label}</strong></p><label>{t("comparator")}<select value={reference} onChange={(e) => { setReference(e.target.value); setSameView(false); }}><option value="">{t("noReference")}</option>{assets.filter((a) => a.id !== selected).map((a) => <option key={a.id} value={a.id}>{`${(videos.find((item) => item.id === a.session_id) ? `${videoLabel(videos.find((item) => item.id === a.session_id)!, lang)} · ${a.session_id?.slice(-6)}` : "")} · ${a.label}`}{!a.measurements ? ` · ${t("ready")}` : ""}</option>)}</select></label><p className="settings-help comparison-help">{t(assets.length < 2 ? "referenceMissing" : "comparisonNote")}</p>{reference && <label className="check"><input type="checkbox" checked={sameView} onChange={(e) => setSameView(e.target.checked)} />{t("sameView")}</label>}{ref && !ref.measurements && <p className="notice">{t("reference_unanalyzed")}</p>}{!reportMatches && report && <p className="notice">{t("comparisonDraft")}</p>}<button disabled={!ready || generating || !!(ref && !ref.measurements)} onClick={() => void action(updateReport).then((success) => { if (success) closeSettings(); })}>{t("compare")}</button></> : <p className="settings-empty-state">{t("comparisonEmpty")}</p>}
           </section>
-          <section className="setting-section" id="settings-playback" aria-labelledby="settings-playback-title"><div className="setting-section-heading"><span>04</span><h3 id="settings-playback-title">{t("playbackSection")}</h3></div><p className="settings-help">{t("playbackHelp")}</p>
+          <section className="setting-section" id="settings-playback" aria-labelledby="settings-playback-title"><div className="setting-section-heading"><span>03</span><h3 id="settings-playback-title">{t("playbackSection")}</h3></div><p className="settings-help">{t("playbackHelp")}</p>
             <label>{t("slow")}<select value={speed} onChange={(e) => setSpeed(e.target.value)}>{["0.25", "0.5", "1"].map((v) => <option key={v} value={v}>{v}×</option>)}</select></label>
             <div className="settings-toggles"><label className="check"><input type="checkbox" checked={focused} onChange={(e) => setFocused(e.target.checked)} />{t("focus")}</label><label className="check"><input type="checkbox" checked={showPose} onChange={(e) => setShowPose(e.target.checked)} />{t("pose")}</label></div>
           </section>
-          <section className="setting-section" id="settings-language" aria-labelledby="settings-language-title"><div className="setting-section-heading"><span>05</span><h3 id="settings-language-title">{t("languageSection")}</h3></div><p className="settings-help">{t("languageHelp")}</p><div className="language" role="group" aria-label={t("languageSection")}><button aria-pressed={lang === "en"} className={lang === "en" ? "selected" : ""} onClick={() => setLang("en")}>English</button><button aria-pressed={lang === "zh"} className={lang === "zh" ? "selected" : ""} onClick={() => setLang("zh")}>中文</button></div></section>
+          <section className="setting-section" id="settings-language" aria-labelledby="settings-language-title"><div className="setting-section-heading"><span>04</span><h3 id="settings-language-title">{t("languageSection")}</h3></div><p className="settings-help">{t("languageHelp")}</p><div className="language" role="group" aria-label={t("languageSection")}><button aria-pressed={lang === "en"} className={lang === "en" ? "selected" : ""} onClick={() => setLang("en")}>English</button><button aria-pressed={lang === "zh"} className={lang === "zh" ? "selected" : ""} onClick={() => setLang("zh")}>中文</button></div></section>
         </div>
         <div className="settings-footer"><span>{busy ? t("busy") : t("settingsSaved")}</span><button className="primary" onClick={closeSettings}>{t("doneSettings")}</button></div>
       </dialog>

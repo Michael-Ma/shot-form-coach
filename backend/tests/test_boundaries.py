@@ -168,10 +168,13 @@ def test_unknown_request_has_one_attempt_and_blocks_new_intent(state):
         calls.append(1)
         raise TimeoutError()
 
-    with pytest.raises(ValueError, match="request_unknown"):
+    with pytest.raises(ValueError, match="provider_timeout"):
         assist(settings, repo, key, asset(), config(), lambda: False, timeout)
     assert len(calls) == 1
-    assert repo.get("job", key)["receipts"][0]["cost"]["estimated_usd"] is None
+    receipt = repo.get("job", key)["receipts"][0]
+    assert receipt["status"] == "request_unknown"
+    assert receipt["diagnostic"]["category"] == "timeout"
+    assert receipt["cost"]["estimated_usd"] is None
     with pytest.raises(ValueError, match="unresolved_request_blocks_resubmission"):
         assist(settings, repo, model_job(repo), asset(), config(), lambda: False, timeout)
     assert len(calls) == 1

@@ -14,6 +14,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .provider_diagnostics import classify_failure
+
 
 class Bilingual(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -476,6 +478,88 @@ def _empty_state(outcome):
     return {"title": title, "detail": detail}
 
 
+def _model_failure_state(diagnostic):
+    """Describe the processing evidence, independently of movement visibility."""
+    states = {
+        "network": (
+            bi("Visual model connection interrupted", "视觉模型连接中断"),
+            bi(
+                "The model connection ended before a complete review arrived. The log does not establish the underlying connection cause.",
+                "模型请求在完整评价返回前连接断开。现有日志还不能确定具体的连接故障原因。",
+            ),
+        ),
+        "rate_limit": (
+            bi("Visual model usage limit reached", "视觉模型触发用量限制"),
+            bi(
+                "The provider reported a rate or usage limit. Check the account's available usage before starting a new request.",
+                "服务返回了请求频率或用量限制。请先检查账户可用额度，再决定是否发起新请求。",
+            ),
+        ),
+        "authentication": (
+            bi("Visual model access was rejected", "视觉模型授权失败"),
+            bi(
+                "The provider rejected authentication or access. Check the selected provider's login or API credentials.",
+                "服务拒绝了身份认证或访问权限。请检查所选服务的登录状态或 API 凭据。",
+            ),
+        ),
+        "schema": (
+            bi("Visual review format was rejected", "视觉评价格式被拒绝"),
+            bi(
+                "The provider rejected the requested output schema. The request format needs to be corrected before trying again.",
+                "服务拒绝了请求中的输出结构。需要先修复请求格式，再重新分析。",
+            ),
+        ),
+        "validation": (
+            bi("Visual review could not be verified", "视觉评价未通过校验"),
+            bi(
+                "A model response arrived, but its structure or evidence references did not pass the app's validation, so its coaching was not used.",
+                "模型已返回结果，但内容结构或证据引用未通过应用校验，因此未采用其中的教练结论。",
+            ),
+        ),
+        "timeout": (
+            bi("Visual model request timed out", "视觉模型请求超时"),
+            bi(
+                "The request did not complete within the allowed time. No complete visual assessment is available from this call.",
+                "请求未在限定时间内完成，本次调用没有取得完整的视觉评价。",
+            ),
+        ),
+        "model": (
+            bi("Selected visual model is unavailable", "所选视觉模型不可用"),
+            bi(
+                "The provider reported that the requested model or endpoint is unavailable. Check the model selection and account access.",
+                "服务报告所选模型或请求端点不可用。请检查模型选择及账户访问权限。",
+            ),
+        ),
+        "request": (
+            bi("Visual model request was rejected", "视觉模型拒绝了请求"),
+            bi(
+                "The provider rejected the request. The available error does not establish a problem with shooting technique or image clarity.",
+                "服务拒绝了此次请求。现有错误信息不能证明投篮动作或画面清晰度存在问题。",
+            ),
+        ),
+        "service": (
+            bi("Visual model service failed", "视觉模型服务出错"),
+            bi(
+                "The provider returned a server error before a complete review became available.",
+                "服务返回了服务器错误，本次未取得完整的视觉评价。",
+            ),
+        ),
+    }
+    if diagnostic.get("category") not in states:
+        return _empty_state("model_failed")
+    title, detail = states[diagnostic["category"]]
+    suffix = bi(
+        " Available local motion measurements are retained. No automatic retry was made.",
+        "已有本地动作数据仍然保留，系统没有自动重试。",
+    )
+    if diagnostic.get("outcome_unknown"):
+        suffix = bi(
+            suffix["en"] + " Whether the call consumed usage remains unknown.",
+            suffix["zh"] + "此次请求是否产生用量仍未知。",
+        )
+    return {"title": title, "detail": {key: value + suffix[key] for key, value in detail.items()}}
+
+
 def build_review(asset, comparison=None):
     rubric = load_rubric()
     has_analysis = bool(asset.get("measurements"))
@@ -490,6 +574,7 @@ def build_review(asset, comparison=None):
     model = asset.get("model_assist") or {}
     coaching = None
     model_failed = bool(asset.get("model_error"))
+    diagnostic = asset.get("model_diagnostic") or classify_failure(code=asset.get("model_error"))
     model_stale = bool(model.get("coaching") and model.get("asset_revision") != asset.get("revision"))
     if model.get("coaching") and not model_stale:
         try:
@@ -498,6 +583,7 @@ def build_review(asset, comparison=None):
             )
         except (ValueError, TypeError):
             model_failed = True
+            diagnostic = classify_failure(code="model_reply_invalid", source="local_validation")
             limitations.append(
                 bi(
                     "The visual review could not be linked to valid evidence, so it was not used.",
@@ -570,7 +656,7 @@ def build_review(asset, comparison=None):
         outcome = "limited_visibility"
     else:
         outcome = "measurements_only"
-    empty_state = _empty_state(outcome)
+    empty_state = _model_failure_state(diagnostic) if outcome == "model_failed" else _empty_state(outcome)
     descriptions_en, descriptions_zh = [], []
     by_id = {m["id"]: m for m in available}
     for key, intro_en, intro_zh in [
@@ -611,6 +697,8 @@ def build_review(asset, comparison=None):
         )
     elif outcome == "model_failed":
         headline = empty_state["title"]
+        if not available:
+            summary = empty_state["detail"]
     elif issues:
         headline = issues[0]["title"]
     elif outcome == "no_priority_issue":
@@ -648,7 +736,7 @@ def build_review(asset, comparison=None):
             )
         )
     if model_failed:
-        limitations.append(_empty_state("model_failed")["detail"])
+        limitations.append(_model_failure_state(diagnostic)["detail"])
     if comparison and comparison.get("status") == "conditional_projection_comparison":
         limitations.append(
             bi(
@@ -664,7 +752,7 @@ def build_review(asset, comparison=None):
             )
         )
     return {
-        "version": "human-review-v2",
+        "version": "human-review-v3",
         "assessment_source": "model" if coaching else "measurements",
         "status": "awaiting_analysis"
         if outcome == "awaiting_analysis"
@@ -672,6 +760,7 @@ def build_review(asset, comparison=None):
         if limited
         else "reviewed",
         "outcome": outcome,
+        "model_diagnostic": diagnostic if model_failed else None,
         "empty_state": empty_state,
         "coverage": {
             "model_review": "accepted"

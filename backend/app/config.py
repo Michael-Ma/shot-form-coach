@@ -19,6 +19,8 @@ class Settings:
     openai_api_key: str = ""
     astra_model: str = "gpt-6-astra"
     codex_bin: str | None = None
+    max_video_upload_mb: int = 2048
+    max_video_duration_us: int = 60 * 60 * 1_000_000
 
     @classmethod
     def from_env(cls):
@@ -35,7 +37,7 @@ class Settings:
         )
 
     def prepare(self):
-        for directory in ["assets", "reports", "models", "receipts"]:
+        for directory in ["assets", "videos", "reports", "models", "receipts"]:
             (self.data_dir / directory).mkdir(parents=True, exist_ok=True)
 
     @property

@@ -45,3 +45,34 @@ class ReportRequest(BaseModel):
 
 class ImportWorkbench(BaseModel):
     run_id: str = Field(pattern=r"^run_[a-zA-Z0-9_]+$")
+
+
+class RevisionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_revision: int = Field(ge=0)
+    expected_lifecycle_revision: int = Field(default=0, ge=0)
+
+
+class AssetLabel(RevisionRequest):
+    label: str = Field(min_length=1, max_length=120)
+
+
+class ClipSpan(BaseModel):
+    """Microseconds on the ORIGINAL video's timeline, never relative to a clip."""
+
+    model_config = ConfigDict(extra="forbid")
+    start_us: int = Field(ge=0)
+    end_us: int = Field(gt=0)
+    label: str | None = Field(default=None, min_length=1, max_length=120)
+    candidate_id: str | None = None
+
+    @model_validator(mode="after")
+    def ordered(self):
+        if not 0 < self.end_us - self.start_us <= 30_000_000:
+            raise ValueError("A clip must be greater than zero and at most 30 seconds")
+        return self
+
+
+class TrimSpan(ClipSpan):
+    expected_revision: int = Field(ge=0)
+    expected_lifecycle_revision: int = Field(default=0, ge=0)

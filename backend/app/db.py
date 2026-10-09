@@ -56,6 +56,57 @@ class Repository:
             )
         return value
 
+    def put_many(self, records):
+        """Publish related lifecycle changes atomically."""
+        with self.lock, self.connect() as conn:
+            conn.executemany(
+                "INSERT OR REPLACE INTO records VALUES(?,?,?)",
+                [(kind, value["id"], json.dumps(value, ensure_ascii=False)) for kind, value in records],
+            )
+
+    def assert_available(self, asset, expected_revision=None, allow_trashed=False):
+        if expected_revision is not None and asset.get("revision", 0) != expected_revision:
+            raise ValueError("stale_revision")
+        if asset.get("trashed_at") and not allow_trashed:
+            raise ValueError("asset_trashed")
+
+    def assert_idle(self, asset_id):
+        for job in self.all("job"):
+            if job["status"] not in ("queued", "running"):
+                continue
+            payload = job.get("payload", {})
+            if asset_id in payload.get("asset_ids", []) or asset_id in (
+                payload.get("asset_id"),
+                payload.get("reference_asset_id"),
+            ):
+                raise ValueError("asset_busy")
+
+    def change_asset(self, asset_id, expected_revision, operation, label=None, expected_lifecycle_revision=0):
+        with self.lock:
+            asset = self.get("asset", asset_id)
+            self.assert_available(asset, expected_revision, allow_trashed=operation == "restore")
+            if asset.get("lifecycle_revision", 0) != expected_lifecycle_revision:
+                raise ValueError("stale_lifecycle_revision")
+            self.assert_idle(asset_id)
+            if operation == "label":
+                if not label or not label.strip():
+                    raise ValueError("invalid_label")
+                asset["label"] = label.strip()
+                asset.update(report=None, report_invalid_reason="label_changed")
+            elif operation == "trash":
+                asset["trashed_at"] = now()
+            elif operation == "restore":
+                if not asset.get("trashed_at"):
+                    raise ValueError("asset_not_trashed")
+                asset["trashed_at"] = None
+            else:
+                raise ValueError("invalid_operation")
+            # Metadata uses a separate token; unchanged pixels/phases retain paid coaching.
+            asset.update(lifecycle_revision=asset.get("lifecycle_revision", 0) + 1, updated_at=now())
+            if operation in ("label", "trash"):
+                self.invalidate_dependents(asset_id)
+            return self.put("asset", asset)
+
     def patch(self, kind, key, **changes):
         with self.lock:
             record = self.get(kind, key)
@@ -73,6 +124,8 @@ class Repository:
     def correct_phase(self, asset_id, correction):
         with self.lock:
             asset = self.get("asset", asset_id)
+            self.assert_available(asset)
+            self.assert_idle(asset_id)
             if asset.get("revision", 0) != correction.expected_revision:
                 raise ValueError("stale_revision")
             frames = asset.get("frame_index") or []
@@ -113,9 +166,10 @@ class Repository:
             if report and report.get("reference_id") == asset_id:
                 self.patch("asset", other["id"], report=None, report_invalid_reason="reference_changed")
 
-    def begin_analysis(self, asset_id, expected_revision):
+    def begin_analysis(self, asset_id, expected_revision, job_id=None):
         with self.lock:
             asset = self.get("asset", asset_id)
+            self.assert_available(asset)
             if asset["revision"] != expected_revision:
                 raise ValueError("stale_revision")
             if asset.get("measurements"):
@@ -129,13 +183,19 @@ class Repository:
                     }
                 ]
             asset.update(report=None, status="analyzing")
+            if job_id:
+                asset["active_job_id"] = job_id
             self.invalidate_dependents(asset_id)
             return self.put("asset", asset)
 
     def publish_report(self, asset_id, revision, report, request, reference):
         with self.lock:
-            if reference and self.get("asset", reference["id"])["revision"] != reference["revision"]:
-                raise ValueError("stale_reference_revision")
+            self.assert_available(self.get("asset", asset_id))
+            if reference:
+                current_reference = self.get("asset", reference["id"])
+                self.assert_available(current_reference)
+                if current_reference["revision"] != reference["revision"]:
+                    raise ValueError("stale_reference_revision")
             updated = self.update_if_revision(
                 asset_id, revision, report=report, status="analyzed", report_request=request
             )
@@ -204,3 +264,39 @@ class Repository:
                 receipts=receipts,
                 error_code="interrupted_request_unknown" if unknown else "worker_interrupted",
             )
+            if job["kind"] == "analysis":
+                for asset_id in job.get("payload", {}).get("asset_ids", []):
+                    try:
+                        asset = self.get("asset", asset_id)
+                    except KeyError:
+                        continue
+                    owned = asset.get("active_job_id") == job["id"] or (
+                        not asset.get("active_job_id") and job.get("current_asset_id") == asset_id
+                    )
+                    if asset.get("status") != "analyzing" or not owned:
+                        continue
+                    current_unknown = any(
+                        r.get("asset_id") == asset_id
+                        and r.get("asset_revision") == asset.get("revision")
+                        and r.get("status") == "request_unknown"
+                        for r in receipts
+                    )
+                    self.patch(
+                        "asset",
+                        asset_id,
+                        status="analysis_failed",
+                        active_job_id=None,
+                        analysis_error="worker_interrupted",
+                        model_error="request_unknown" if current_unknown else "worker_interrupted",
+                    )
+            video_id = job.get("payload", {}).get("video_id")
+            if video_id and job["kind"] in ("video_import", "video_scan"):
+                self.patch(
+                    "video",
+                    video_id,
+                    **(
+                        {"status": "failed", "error_code": "worker_interrupted"}
+                        if job["kind"] == "video_import"
+                        else {"scan_status": "failed", "scan_error": "worker_interrupted"}
+                    ),
+                )
