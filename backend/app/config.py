@@ -19,6 +19,7 @@ class Settings:
     openai_api_key: str = ""
     astra_model: str = "gpt-6-astra"
     codex_bin: str | None = None
+    codex_debug: bool = False
     max_video_upload_mb: int = 2048
     max_video_duration_us: int = 60 * 60 * 1_000_000
 
@@ -34,6 +35,7 @@ class Settings:
             openai_api_key=os.getenv("OPENAI_API_KEY", ""),
             astra_model=os.getenv("ASTRA_MODEL") or "gpt-6-astra",
             codex_bin=os.getenv("SFC_CODEX_BIN") or None,
+            codex_debug=os.getenv("SFC_CODEX_DEBUG", "").strip().lower() in ("1", "true", "yes", "on"),
         )
 
     def prepare(self):

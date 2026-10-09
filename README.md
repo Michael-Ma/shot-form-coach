@@ -164,6 +164,30 @@ separately. Local analysis remains available. API prices are estimates; Codex pl
 Selecting a remote model and starting analysis sends the selected frames to that model's service.
 Keys and local runtime data remain outside Git. Qwen is still an evaluation candidate.
 
+## Diagnose a Codex connection failure
+
+Set `SFC_CODEX_DEBUG=1` in the local `.env`, then restart the app. This enables targeted Rust
+network diagnostics only for the analysis subprocess; it does not edit your Codex configuration.
+The child retains zero automatic retries. A historical request with an unknown outcome is not
+resubmitted merely because diagnostics were enabled.
+
+New call records separate the local CLI thread ID from remote request/response identifiers.
+They record input frame count and JPEG byte size, schema hash, timestamps and elapsed time,
+the subprocess exit, and connection/timeout evidence when the CLI provides it. The new stderr
+and timing logs keep only allowed diagnostic fields before writing to disk, with size limits;
+raw headers, credentials, URLs, prompts and image bytes are excluded from those logs. Existing
+receipt inputs and model replies remain private local artifacts under `.data/receipts/`.
+
+For a new call, inspect `diagnostics.json` for the final summary, `timeline.jsonl` for ordered
+events with timestamps, and `stderr.log` for the sanitized network facts. An explicit
+`is_timeout=true`, `is_connect=true`, HTTP rejection or TLS/DNS cause is stronger evidence
+than the generic CLI failure message. Fields remain absent when the CLI does not report them.
+
+A generic `error sending request` message alone does not establish a timeout. Use explicit
+timeout/connect flags or other captured transport evidence to narrow the cause. Old logs cannot
+recover network details that were never recorded. See the official
+[Codex diagnostic environment variables](https://learn.chatgpt.com/docs/config-file/environment-variables).
+
 ## Design and implementation
 
 - [Improved design, current V1 scope](docs/DESIGN_V2.zh-CN.md)

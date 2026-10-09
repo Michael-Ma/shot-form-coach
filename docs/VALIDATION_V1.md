@@ -231,3 +231,69 @@ and model-review records were preserved. Seven analyzed clips' reports were rebu
 from cached data; all jobs succeeded, every report matched its clip revision and v3 coaching,
 and all seven exported videos passed full decoding. The installed browser view reported no
 console errors or warnings.
+
+## Duplicate-pose recovery and Codex transport diagnostics (V0.6.1)
+
+148 backend tests pass, with Ruff and the TypeScript/Vite production build. New tests cover
+duplicate versus distinct bodies, conflicting limbs, non-finite coordinates, identity changes,
+short and long gaps, normal jump continuity, invisible-wrist false positives, bounded trace
+retention, and persistence through the worker. Detailed scan evidence is available at the
+video's `scan_diagnostics_url`; ordinary polled video responses omit the large decision trace
+and anomaly-event arrays. The endpoint labels retained evidence as the last successful scan
+and also reports the current scan status/error.
+
+The original 54.838-second source was decoded and scanned from frame zero using the same
+MediaPipe model and 5 Hz sampling. V2 returns peaks at **5.000000, 14.401667, 24.401667,
+33.803333, 43.005000 and 52.005000 seconds**. All five V1 peaks are unchanged; only the missing
+shot was added. At 14.401667 seconds the trace records two raw poses, one distinct pose after
+geometry checks, `duplicate_pose_merged`, and an updated pending peak. The pair shared nine
+reliable support joints; eight were within the configured agreement threshold. These are
+geometric compatibility checks, not verified identity or a calibrated probability of duplication.
+
+Whole-video validation caught and corrected two intermediate regressions before release:
+ordinary jumping was initially rejected by a restrictive movement gate, and preserving an
+unqualified low-wrist observation through missing data introduced an extra candidate. The
+final implementation allows ordinary adjacent-frame movement separately from stricter
+reacquisition after a gap. It retains V1's conservative reset of unqualified missing-wrist
+history while preserving already qualified motion for review. True ambiguity, long gaps and
+identity discontinuity do not create a new low-to-high action across the gap.
+
+A second run through the actual worker completed in about 13.5 seconds, persisted the six
+candidates and the 14.40-second anomaly, and preserved all 17 assets in the isolated QA copy
+(including its previously trashed version). The results remain unconfirmed candidates; this
+single-source regression does not establish general recall or precision.
+
+### Codex investigation and controlled reproduction
+
+The two historical failures were not the app's 1,200-second deadline: their receipts record
+`codex_call_failed`, and the final error-file times were approximately 2.5 and 2.3 seconds after
+call registration. These are filesystem timing estimates, not exact network latency. One failed
+66-frame input was byte-for-byte the same ordered image set used in two earlier successful
+calls (18,810,307 JPEG bytes). Historical logs do not contain an HTTP status, underlying exception
+chain or transport timeout/connect flags, so a specific historical network cause remains unknown.
+
+Current Codex doctor checks found the configured provider reachable over HTTP and an available
+WebSocket handshake. These reachability checks alone are not a model inference test. The
+production runner still uses its configured HTTP transport, with zero automatic retries.
+
+**One live controlled inference** used 66 newly generated synthetic calibration JPEGs totaling
+18,634,576 bytes, the same requested Astra model and CLI version, and exactly the same 4,061-byte
+output schema as the failed calls. The targeted diagnostic log captured a Responses HTTP 200 at
+11.570 seconds, model output at 32.596 seconds, completion at 32.636 seconds, and process exit 0
+at 33.171 seconds. Usage was 95,221 input tokens and 739 output tokens. The result passed both
+the structured reply and coaching-evidence validation. This establishes that the current full
+image/schema route works; it does not reconstruct the historical intermittent failure. No
+private footage or failed private request was sent again.
+
+New per-call `diagnostics.json`, `timeline.jsonl` and sanitized `stderr.log` record terminal
+timing, input size, schema/config identity and typed transport evidence when supplied. Local
+CLI thread IDs are kept separate from remote response/request IDs. Only content-free allowed
+fields from targeted debug output reach the new logs. Tests exercise secret/header/body
+filtering, log size caps, request attribution, timeout false positives, cause specificity,
+pipe backpressure, cancellation with blocked input, timeout after output closes and spawn
+failure. Raw debug logs and diagnostics are not committed to Git.
+
+The installed local app was upgraded to 0.6.1 and targeted CLI diagnostics were enabled for
+future user-initiated analyses. The original 13 clips, source hashes, frame mappings, phase
+revisions, model-review records and saved reports matched the pre-update snapshot exactly.
+No private analysis was resubmitted during installation.

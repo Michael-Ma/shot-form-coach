@@ -311,3 +311,34 @@ def test_long_recording_does_not_silently_truncate_later_candidates():
     proposed = propose_candidates(samples, 820_000_000)
     assert len(proposed) == 205
     assert proposed[-1]["peak_us"] == 816_200_000
+
+
+def test_detailed_scan_evidence_is_available_without_bloating_polled_video_responses(state):
+    settings, repo = state
+    evidence = {
+        "method": "local_pose_wrist_rise_v2",
+        "anomaly_counts": {"duplicate_pose_merged": 1},
+        "anomaly_events": [{"time_us": 400_000, "code": "duplicate_pose_merged"}],
+        "decision_trace": [{"time_us": 400_000, "raw_pose_count": 2, "distinct_pose_count": 1}],
+    }
+    repo.put(
+        "video",
+        {
+            "id": "video_fixture",
+            "kind": "source",
+            "label": "Fixture",
+            "status": "ready",
+            "duration_us": 1_000_000,
+            "scan_status": "failed",
+            "scan_error": "cancelled",
+            "scan_evidence": evidence,
+        },
+    )
+    with TestClient(create_app(settings, start_worker=False)) as client:
+        for public in [client.get("/api/videos").json()[0], client.get("/api/videos/video_fixture").json()]:
+            assert public["scan_evidence"]["anomaly_counts"] == evidence["anomaly_counts"]
+            assert "decision_trace" not in public["scan_evidence"]
+            assert "anomaly_events" not in public["scan_evidence"]
+            detailed = client.get(public["scan_diagnostics_url"]).json()
+            assert detailed["last_successful_scan_evidence"] == evidence
+            assert detailed["scan_status"] == "failed" and detailed["scan_error"] == "cancelled"

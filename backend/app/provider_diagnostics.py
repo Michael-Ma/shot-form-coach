@@ -5,15 +5,56 @@ from __future__ import annotations
 import json
 import re
 
+from .codex_diagnostics import network_facts
+
+NETWORK_CAUSES = {
+    "tls_certificate": "TLS certificate verification failed.",
+    "dns_resolution": "DNS resolution failed.",
+    "connection_reset": "The connection was reset.",
+    "connection_refused": "The connection was refused.",
+    "broken_pipe": "The connection closed while data was being written.",
+    "tls_handshake": "TLS negotiation failed.",
+    "proxy_connection": "The proxy connection failed.",
+    "http2_protocol": "The HTTP/2 connection reported a protocol error.",
+    "network_timeout": "The HTTP client's network timeout expired.",
+    "connection_failure": "The HTTP client reported a connection failure.",
+    "request_send_failure": "The HTTP client could not finish sending the request.",
+}
+
+
+def with_network_evidence(diagnostic, facts):
+    causes = [cause for cause in facts.get("causes", []) if cause in NETWORK_CAUSES]
+    if not causes:
+        return {**diagnostic, "transport": facts} if facts else diagnostic
+    if diagnostic["category"] not in ("unknown", "network", "timeout"):
+        return {**diagnostic, "transport": facts}
+    cause = causes[0]
+    if (
+        diagnostic.get("cause") in NETWORK_CAUSES
+        and diagnostic["cause"] not in ("connection_failure", "request_send_failure")
+        and cause in ("connection_failure", "request_send_failure")
+    ):
+        return {**diagnostic, "transport": facts}
+    return {
+        **diagnostic,
+        "code": "provider_timeout" if cause == "network_timeout" else "provider_network_error",
+        "category": "timeout" if cause == "network_timeout" else "network",
+        "cause": cause,
+        "detail": NETWORK_CAUSES[cause],
+        "transport": facts,
+    }
+
 
 def classify_failure(message="", *, code=None, http_status=None, source="provider"):
     """Classify only explicit error evidence; never publish arbitrary exception text.
 
     Error bodies can echo credentials or private request input. Public messages are
-    fixed, recognized phrases; the original CLI event remains in the local log.
+    fixed, recognized phrases; raw errors are inspected in memory only.
     A connection failure alone cannot establish whether remote usage occurred.
     """
+    facts = network_facts(message)
     text = message.lower() if isinstance(message, str) else ""
+    text = re.sub(r"\bis_(?:timeout|connect)\s*[:=]\s*(?:true|false)\b", "", text)
     code = code.lower() if isinstance(code, str) else ""
     if not isinstance(http_status, int) or isinstance(http_status, bool):
         match = re.search(r"(?:http(?:\s+status)?|status(?:\s+code)?)\s*[:=]?\s*(\d{3})\b", text)
@@ -142,13 +183,18 @@ def classify_failure(message="", *, code=None, http_status=None, source="provide
             code,
             "The local Codex CLI is unavailable or needs an update.",
         )
-    return {
+    diagnostic = {
         "code": public_code,
         "category": category,
         "message": public_message,
         "http_status": http_status,
         "source": source,
     }
+    return (
+        with_network_evidence(diagnostic, facts)
+        if facts.get("causes") or "is_timeout" in facts or "is_connect" in facts
+        else diagnostic
+    )
 
 
 def event_failure(event):

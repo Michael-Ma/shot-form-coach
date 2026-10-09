@@ -111,6 +111,13 @@ def create_app(settings=None, start_worker=True):
             for k, v in video.items()
             if k not in ("original_path", "preview_path", "thumbnail_path", "raw_pts_origin", "clips")
         }
+        evidence = video.get("scan_evidence")
+        if evidence:
+            # The UI polls these summaries. Detailed traces are fetched explicitly.
+            result["scan_evidence"] = {
+                k: v for k, v in evidence.items() if k not in ("decision_trace", "anomaly_events")
+            }
+            result["scan_diagnostics_url"] = f"/api/videos/{video['id']}/scan-diagnostics"
         result["preview_url"] = f"/api/videos/{video['id']}/preview" if video.get("preview_path") else None
         result["thumbnail_url"] = (
             f"/api/videos/{video['id']}/thumbnail" if video.get("thumbnail_path") else None
@@ -177,6 +184,18 @@ def create_app(settings=None, start_worker=True):
     def video(key: str, include_trashed: bool = False):
         return video_public(video_session(key), include_trashed=include_trashed, detail=True)
 
+    @api.get("/api/videos/{key}/scan-diagnostics")
+    def scan_diagnostics(key: str):
+        video = get("video", key)
+        if not video.get("scan_evidence"):
+            raise HTTPException(404, "scan_diagnostics_unavailable")
+        return {
+            "video_id": key,
+            "scan_status": video.get("scan_status"),
+            "scan_error": video.get("scan_error"),
+            "last_successful_scan_evidence": video["scan_evidence"],
+        }
+
     @api.get("/api/videos/{key}/preview")
     def video_preview(key: str):
         video = get("video", key)
@@ -227,7 +246,7 @@ def create_app(settings=None, start_worker=True):
         return {
             "status": "ok",
             "app": "shot-form-coach",
-            "version": "0.6.0",
+            "version": "0.6.1",
             "gemini_configured": bool(settings.api_key),
             "gemini_model": settings.model_id,
             "astra_model": settings.astra_model,
