@@ -127,7 +127,6 @@ const EN: Record<string, string> = {
   subtitle: "Observe a movement. Test one change.",
   session: "Your shots",
   import: "Import a clip",
-  workbench: "Import Workbench clips",
   empty: "Import a shooting clip to begin.",
   review: "Movement review",
   loading: "Loading…",
@@ -247,8 +246,6 @@ const EN: Record<string, string> = {
   missingModels:
     "Vision models are missing. Run the model download command in the README.",
   invalid_or_long_video: "Choose a readable video of at most 30 seconds.",
-  workbench_import_failed:
-    "Could not import this run. Check the configured Workbench data folder.",
   stale_revision: "This shot changed. Refresh and try again.",
   stale_reference_revision: "The comparator changed. Update the report again.",
   request_unknown: "The model response is unknown. It was not retried.",
@@ -292,7 +289,6 @@ const ZH: Record<string, string> = {
   subtitle: "看清一个变化，检验一个调整。",
   session: "我的投篮",
   import: "导入投篮片段",
-  workbench: "导入 Workbench 片段",
   empty: "先导入一次投篮，开始复盘。",
   review: "动作观察",
   loading: "加载中…",
@@ -408,7 +404,6 @@ const ZH: Record<string, string> = {
   noKey: "Gemini 需要在服务端配置 API key。",
   missingModels: "缺少视觉模型，请运行 README 中的模型下载命令。",
   invalid_or_long_video: "请选择可读取、30 秒以内的投篮片段。",
-  workbench_import_failed: "无法导入这组片段，请检查 Workbench 数据目录配置。",
   stale_revision: "片段版本已变化，请刷新后重试。",
   stale_reference_revision: "参照片段已变化，请重新更新报告。",
   request_unknown: "模型返回结果未知，系统没有自动重试。",
@@ -661,7 +656,7 @@ const REVIEW_EN: Record<string, string> = {
   timeline: "Video position", releaseJump: "Go to release", slow: "Playback speed", currentShot: "This shot",
   selectedEvidence: "Showing the evidence for", reviewTools: "Frame tools & release correction",
   advanced: "Analysis settings", providers: "Model availability", methodHint: "Local vision measures movement. Gemini or Astra can add a visual coaching review.",
-  uploadHint: "Up to 30 seconds · video only", moreImport: "Import from Workbench", noReference: "No comparison selected",
+  uploadHint: "Up to 30 seconds · video only", noReference: "No comparison selected",
   comparator: "Compare with another of your shots", comparisonNote: "Your reference is a personal example, not an ideal or standard shot.",
   compare: "Update comparison", comparisonDraft: "The reference changed. Update the comparison to see matching results and exports.",
   comparisonLabel: "Saved comparison", noComparison: "Choose a reference to explore your consistency.",
@@ -695,7 +690,7 @@ const REVIEW_ZH: Record<string, string> = {
   timeline: "视频位置", releaseJump: "跳到离手", slow: "播放速度", currentShot: "这一球",
   selectedEvidence: "当前查看", reviewTools: "逐帧工具与离手修正",
   advanced: "分析设置", providers: "模型可用情况", methodHint: "本地视觉测量动作；Gemini 或 Astra 可补充画面复盘。",
-  uploadHint: "30 秒以内 · 视频片段", moreImport: "从 Workbench 导入", noReference: "暂不对比",
+  uploadHint: "30 秒以内 · 视频片段", noReference: "暂不对比",
   comparator: "和自己的另一球对比", comparisonNote: "参照是你自己的一个样本，不会被当作标准或理想动作。",
   compare: "更新对比", comparisonDraft: "参照已变化。更新对比后，再查看对应结果与导出文件。",
   comparisonLabel: "当前已保存的对比", noComparison: "选一球作参照，看看自己的动作是否一致。",
@@ -728,10 +723,6 @@ const SETTINGS_EN: Record<string, string> = {
   nextAnalysis: "These choices apply when you next analyze. Changing a setting does not rerun a review.",
   selectedMethod: "Next analysis", configureAnalysis: "Choose in Settings", uploadAnalyze: "Choose a video & analyze", importAnalyze: "Import & analyze",
   importMethod: "New clips will be analyzed with", fromDevice: "From this device", fromDeviceHelp: "Choose a short video containing one complete shot.",
-  workbench: "Import pre-cut shots", workbenchHelp: "From Video Event Workbench: imports shooting clips from completed runs and keeps their original video times. It is not another analysis model.",
-  workbenchWhen: "Use this if you have already split a longer video into shots in Workbench. Otherwise, choose a video above.",
-  workbenchRun: "Completed Workbench run", workbenchClips: "clips", workbenchUnconfigured: "Workbench is not connected. You can still add a video from this device.",
-  workbenchEmpty: "No completed runs with clips are available yet.", workbenchLoading: "Checking completed Workbench runs…", workbenchLoadError: "Could not load Workbench runs. Try again.", reloadRuns: "Check again",
   settingsSaved: "Preferences are saved in this browser.", playbackHelp: "These preferences apply immediately to the video preview.",
   languageHelp: "Changes the interface and the language used for your next report export.",
   comparisonScope: "For the selected shot", comparisonEmpty: "Open a clip review to choose its personal reference and update its comparison.",
@@ -758,10 +749,6 @@ const SETTINGS_ZH: Record<string, string> = {
   nextAnalysis: "这些选项用于下一次分析。修改设置不会自动重新分析。",
   selectedMethod: "下次分析", configureAnalysis: "在设置中选择", uploadAnalyze: "选择视频并分析", importAnalyze: "导入并分析",
   importMethod: "新片段将使用以下方式分析", fromDevice: "从电脑选择视频", fromDeviceHelp: "选择一个包含完整投篮动作的短视频。",
-  workbench: "导入已截好的投篮", workbenchHelp: "来自 Video Event Workbench：读取已完成任务中的投篮短片段，并保留原视频时间；不是另一种分析模型。",
-  workbenchWhen: "如果你已经用 Workbench 把长视频截成一球一段，可以从这里导入；否则直接在上方选择视频即可。",
-  workbenchRun: "已完成的 Workbench 任务", workbenchClips: "个片段", workbenchUnconfigured: "尚未连接 Workbench，仍可直接从电脑添加视频。",
-  workbenchEmpty: "暂时没有包含投篮片段的已完成任务。", workbenchLoading: "正在查找已完成的 Workbench 任务…", workbenchLoadError: "暂时无法读取 Workbench 任务，请重试。", reloadRuns: "重新查找",
   settingsSaved: "偏好设置已保存在当前浏览器。", playbackHelp: "这些选项会立即应用到视频预览。",
   languageHelp: "切换界面语言，同时用于下一次生成的报告。",
   comparisonScope: "用于当前投篮", comparisonEmpty: "先打开某个片段的复盘，再为这球选择个人参照并更新对比。",
@@ -802,9 +789,7 @@ export default function App() {
   const [reference, setReference] = useState("");
   const [sameView, setSameView] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [health, setHealth] = useState<{ gemini_configured: boolean; astra_api_configured: boolean; codex: { ready: boolean; reason: string | null }; models_ready: boolean; workbench_configured?: boolean }>();
-  const [runs, setRuns] = useState<{ id: string; clip_count: number }[]>([]);
-  const [run, setRun] = useState("");
+  const [health, setHealth] = useState<{ gemini_configured: boolean; astra_api_configured: boolean; codex: { ready: boolean; reason: string | null }; models_ready: boolean }>();
   const [focused, setFocused] = useState(() => savedChoice("sfc-focus", ["true", "false"], "true") === "true");
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -825,7 +810,6 @@ export default function App() {
   const [error, setError] = useState("");
   const [speed, setSpeed] = useState(() => savedChoice("sfc-speed", ["0.25", "0.5", "1"], "0.5"));
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [runsState, setRunsState] = useState<"loading" | "ready" | "error">("loading");
   const settingsDialog = useRef<HTMLDialogElement>(null);
   const settingsTrigger = useRef<HTMLButtonElement>(null);
   const settingsOpener = useRef<HTMLElement | null>(null);
@@ -842,14 +826,6 @@ export default function App() {
     setSettingsOpen(true);
   }
   function closeSettings() { setSettingsOpen(false); }
-  async function loadRuns() {
-    setRunsState("loading");
-    try {
-      const available = await api<typeof runs>("/workbench/runs");
-      setRuns(available); setRun((value) => available.some((item) => item.id === value) ? value : available[0]?.id || "");
-      setRunsState("ready");
-    } catch { setRunsState("error"); }
-  }
   const [evidenceLabel, setEvidenceLabel] = useState("");
   const video = useRef<HTMLVideoElement>(null);
   const evidenceSection = useRef<HTMLElement>(null);
@@ -882,7 +858,6 @@ export default function App() {
   useEffect(() => {
     void refresh().catch((e) => { setError(e.message); setLoaded(true); });
     void api<typeof health>("/health").then(setHealth).catch((e) => setError(e.message));
-    void loadRuns();
   }, []);
   useEffect(() => {
     if (!active) return;
@@ -994,10 +969,6 @@ export default function App() {
   const methodSelect = <label className="method-select">{t("mode")}<select value={mode} onChange={(e) => setMode(e.target.value)} disabled={generating}>
     <option value="local">{t("local")}</option><option value="gemini" disabled={!health?.gemini_configured}>{t("gemini")}{!health?.gemini_configured ? ` · ${t("setup")}` : ""}</option><option value="astra_codex" disabled={!health?.codex?.ready}>{t("astra_codex")}{!health?.codex?.ready ? ` · ${t("setup")}` : ""}</option><option value="astra_api" disabled={!health?.astra_api_configured}>{t("astra_api")}{!health?.astra_api_configured ? ` · ${t("setup")}` : ""}</option>
   </select></label>;
-  const legacyImport = <div className="import-option workbench-option"><h4>{t("workbench")}</h4><p>{t("workbenchHelp")}</p><p className="workbench-when">{t("workbenchWhen")}</p>
-              {health?.workbench_configured === false ? <p className="settings-empty-state">{t("workbenchUnconfigured")}</p> : runsState === "loading" ? <p className="settings-empty-state" role="status">{t("workbenchLoading")}</p> : runsState === "error" ? <p className="settings-empty-state" role="status">{t("workbenchLoadError")}</p> : !runs.length ? <p className="settings-empty-state">{t("workbenchEmpty")}</p> : <div className="workbench"><label>{t("workbenchRun")}<select value={run} onChange={(e) => setRun(e.target.value)}>{runs.map((r) => <option key={r.id} value={r.id}>{r.id.slice(-8)} · {r.clip_count} {t("workbenchClips")}</option>)}</select></label><button disabled={busy || !run} onClick={() => void action(async () => { const imported = await api<Asset[]>("/workbench/import", post({ run_id: run })); if (imported.length) { setSelected(imported[0].id); if (imported[0].session_id) { setVideoId(imported[0].session_id); setScreen("clips"); } } })}>{lang === "zh" ? "导入片段" : "Import clips"}</button></div>}
-              {health?.workbench_configured !== false && runsState !== "loading" && <button className="text-button" onClick={() => void loadRuns()}>{t("reloadRuns")}</button>}
-            </div>;
   const sessionAssets = assets.filter((asset) => !videoId || asset.session_id === videoId);
   const sessionVideo = videos.find((item) => item.id === videoId);
   const sessionLabel = sessionVideo ? videoLabel(sessionVideo, lang) : "";
@@ -1010,7 +981,7 @@ export default function App() {
         <button className="settings-trigger" ref={settingsTrigger} onClick={openSettings} aria-haspopup="dialog" aria-expanded={settingsOpen} aria-controls="settings-dialog"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M4 17h16M8 4v6M16 14v6" /></svg><span>{t("settingsTitle")}</span></button>
       </header>
       {screen === "review" && <nav className="workflow-breadcrumb" aria-label={lang === "zh" ? "当前流程" : "Current workflow"}><button onClick={() => { setScreen("library"); setVideoId(""); }}>{lifecycleText(lang, "library")}</button><span>/</span><button onClick={() => openVideo(videoId)}>{sessionLabel || lifecycleText(lang, "stepClips")}</button><span>/</span><strong>{chosen?.label}</strong></nav>}
-      {screen !== "review" ? <main className="lifecycle-main"><div className="lifecycle-shell">{error && !settingsOpen && <div className="error" role="alert">{t(error)}</div>}<Lifecycle lang={lang} videos={videos} assets={assets} videoId={screen === "clips" ? videoId : ""} loaded={loaded} busy={busy} active={active} jobs={jobs} refreshVersion={refreshVersion} modeLabel={t(mode)} canAnalyze={canStart} analysisProblem={!modeReady ? t(modeProblem) : health?.models_ready === false ? t("missingModels") : active ? t("analyzingOther") : undefined} remoteMode={mode !== "local"} onOpenVideo={openVideo} onBack={() => { setScreen("library"); setVideoId(""); }} onReview={openReview} onSettings={openSettings} run={action} onAnalyze={(ids) => action(() => analyze(ids))} legacyImport={legacyImport} tStatus={t} /></div></main> : <main>
+      {screen !== "review" ? <main className="lifecycle-main"><div className="lifecycle-shell">{error && !settingsOpen && <div className="error" role="alert">{t(error)}</div>}<Lifecycle lang={lang} videos={videos} assets={assets} videoId={screen === "clips" ? videoId : ""} loaded={loaded} busy={busy} active={active} jobs={jobs} refreshVersion={refreshVersion} modeLabel={t(mode)} canAnalyze={canStart} analysisProblem={!modeReady ? t(modeProblem) : health?.models_ready === false ? t("missingModels") : active ? t("analyzingOther") : undefined} remoteMode={mode !== "local"} onOpenVideo={openVideo} onBack={() => { setScreen("library"); setVideoId(""); }} onReview={openReview} onSettings={openSettings} run={action} onAnalyze={(ids) => action(() => analyze(ids))} tStatus={t} /></div></main> : <main>
         <aside className="sidebar" aria-label={t("session")}>
           <div className="section-title"><h2>{lifecycleText(lang, "organized")}</h2><span className="count">{sessionAssets.length}</span></div>
           <button className="text-button manage-from-review" onClick={() => openVideo(videoId)}>← {lifecycleText(lang, "stepClips")}</button>

@@ -171,34 +171,3 @@ def ingest(settings, repo, path: Path, filename: str, upstream=None, label=None)
         "report": None,
     }
     return repo.put("asset", record)
-
-
-def import_workbench(settings, repo, run_id):
-    if not settings.workbench_data:
-        raise MediaError("Workbench data directory is not configured")
-    root = settings.workbench_data.resolve()
-    run_dir = (root / "runs" / run_id).resolve()
-    if not run_dir.is_relative_to(root):
-        raise MediaError("Invalid run path")
-    results = json.loads((run_dir / "results.json").read_text())
-    imported = []
-    for index, event in enumerate(results.get("events", [])):
-        clip = event.get("clip")
-        if not clip or event.get("duplicate_of") or event.get("clip_status") != "succeeded":
-            continue
-        source = (root / clip["path"]).resolve()
-        if not source.is_relative_to(root):
-            raise MediaError("Clip path is outside the configured Workbench directory")
-        upstream = {
-            "run_id": run_id,
-            "event_id": event["event_id"],
-            "source_start_us": clip["actual_range_us"][0],
-            "source_end_us": clip["actual_range_us"][1],
-            "source_first_frame_index": clip.get("metadata", {})
-            .get("source_first_frame", {})
-            .get("frame_index"),
-            "camera_group": event["event_id"].split("_")[0] + ":" + run_id,
-            "result_bucket": event.get("result_bucket"),
-        }
-        imported.append(ingest(settings, repo, source, source.name, upstream, label=f"Shot {index + 1}"))
-    return imported

@@ -70,8 +70,6 @@ select { border: 1px solid var(--line); background: var(--paper); padding: 11px 
 .provider-help ul { padding-left: 17px; line-height: 1.7; }
 .provider-help li + li { margin-top: 9px; }
 .sidebar-note { color: var(--muted); font-size: 11px; line-height: 1.8; margin: 20px 3px; }
-.workbench { display: grid; gap: 8px; margin-top: 15px; }
-.workbench select,.workbench button { font-size: 11px; }
 .workspace { min-width: 0; max-width: 1210px; padding: 32px 42px 48px; }
 .review-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px; gap: 22px; }
 .analyze-button { font-size: 13px; flex-shrink: 0; }
@@ -286,8 +284,6 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid va
   .settings select { font-size: 14px; min-height: 44px; }
   .settings label { font-size: 13px; }
   .provider-help { font-size: 12px; }
-  .workbench { display: grid; grid-template-columns: 100px 1fr; }
-  .workbench select,.workbench button { font-size: 12px; min-height: 44px; }
   .workspace { padding: 23px 16px 33px; }
   .review-heading { gap: 12px; margin-bottom: 20px; }
   h1 { font-size: 24px; }
@@ -422,15 +418,7 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid va
 .batch-analysis { margin-top: 19px; font-size: 12px; background: transparent; }
 .import-method-note { font-size: 12px; color: var(--muted); margin-bottom: 21px; }
 .import-method-note strong { display: inline-block; color: var(--green); margin-left: 5px; font-weight: 600; }
-.import-option h4 { font-size: 14px; margin-bottom: 7px; }
-.import-option > p { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.9; }
-.import-option > button { font-size: 13px; min-height: 44px; }
-.import-option small { display: block; font-size: 11px; color: var(--muted); margin-top: 9px; }
-.workbench-option { margin-top: 25px; padding-top: 24px; border-top: 1px dashed var(--line); }
-.workbench-option > .workbench-when { font-size: 11px; color: #7a8471; }
 .settings-empty-state { font-size: 12px; color: #677561; line-height: 1.85; background: #f0f3e9; padding: 12px 14px; border-radius: 7px; }
-.setting-section .workbench { grid-template-columns: minmax(0, 1fr); gap: 12px; margin-top: 16px; }
-.setting-section .workbench > button { justify-self: start; min-height: 44px; font-size: 13px; }
 .setting-section .comparison-help { margin: 11px 0 14px; }
 #settings-comparison > button { margin-top: 16px; font-size: 12px; }
 .settings-toggles { display: grid; gap: 8px; margin-top: 17px; }
@@ -458,7 +446,7 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid va
   .settings-nav a { font-size: 11px; padding: 12px 7px; min-height: 40px; }
   .settings-body { padding: 0 20px; scrollbar-gutter: auto; }
   .setting-section { padding: 24px 0; }
-  .settings-help,.settings-method-hint,.import-option > p { font-size: 12px; }
+  .settings-help,.settings-method-hint { font-size: 12px; }
   .settings-fields { gap: 15px 12px; }
   .setting-section select { font-size: 14px; }
   .settings-footer { padding: 14px 20px max(14px, env(safe-area-inset-bottom)); gap: 12px; }
@@ -584,17 +572,13 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid va
 .library-empty > span { display: block; font-size: 39px; color: #8ca478; margin-bottom: 16px; }
 .library-empty h3 { font-size: 21px; }
 .library-empty p { color: var(--muted); font-size: 14px; max-width: 580px; margin: auto; }
-.legacy-import { margin-top: 34px; max-width: 760px; }
-.legacy-import .workbench-option { margin: 0; padding-top: 0; border-top: 0; }
-.legacy-import .workbench { grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 14px; }
-.legacy-import .workbench button { font-size: 13px; }
 .back-to-videos { margin: -12px 0 21px; font-size: 13px; }
 .manage-heading { display: flex; justify-content: space-between; gap: 30px; align-items: flex-start; margin-bottom: 28px; }
 .manage-heading h1 { font-size: 30px; line-height: 1.4; }
 .manage-heading p { font-size: 13px; color: var(--muted); margin: 11px 0 0; max-width: 770px; }
 .source-duration { flex-shrink: 0; font-size: 24px; font-variant-numeric: tabular-nums; text-align: right; }
 .source-duration small { display: block; font-size: 11px; color: var(--muted); margin-top: 9px; }
-.clip-workbench-grid { display: grid; grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr); align-items: start; gap: 32px; }
+.clip-management-grid { display: grid; grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr); align-items: start; gap: 32px; }
 .source-panel { border: 1px solid var(--line); background: var(--paper); border-radius: 12px; padding: 21px; min-width: 0; }
 .source-panel-heading { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 17px; }
 .source-panel h2 { font-size: 17px; margin: 0; }
@@ -682,7 +666,7 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid va
   .lifecycle-shell { padding: 30px; }
   .library-hero { gap: 35px; grid-template-columns: minmax(0, 1fr) 200px; }
   .video-grid { gap: 17px; }
-  .clip-workbench-grid { gap: 22px; }
+  .clip-management-grid { gap: 22px; }
   .source-panel { padding: 17px; }
   .managed-clip-list > li { gap: 9px; padding: 12px; }
   .clip-thumb { width: 56px; height: 75px; }
@@ -694,7 +678,7 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid va
   .flow-overview li { display: grid; gap: 7px; }
   .flow-overview strong { font-size: 12px; }
   .video-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .clip-workbench-grid { grid-template-columns: 1fr; }
+  .clip-management-grid { grid-template-columns: 1fr; }
   .source-player { max-height: 380px; }
   .managed-clips { padding-top: 10px; }
   .clip-thumb { width: 72px; height: 90px; }
@@ -719,8 +703,6 @@ footer { display: flex; justify-content: space-between; border-top: 1px solid va
   .video-card-copy { padding: 18px; }
   .video-card-image { aspect-ratio: 16/8; }
   .video-collection { padding-top: 26px; }
-  .legacy-import .workbench { grid-template-columns: 1fr; }
-  .legacy-import button { min-height: 44px; }
   .manage-heading { gap: 15px; }
   .manage-heading h1 { font-size: 23px; }
   .manage-heading p { font-size: 12px; }

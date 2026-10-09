@@ -247,11 +247,10 @@ def sessions(repo):
     for asset in repo.all("asset"):
         key = session_id(asset)
         if key not in result:
-            upstream = asset.get("upstream") or {}
             result[key] = {
                 "id": key,
-                "kind": "workbench" if upstream.get("run_id") else "legacy",
-                "label": f"Workbench · {upstream['run_id']}" if upstream.get("run_id") else "Earlier clips",
+                "kind": "legacy",
+                "label": "Earlier clips",
                 "filename": None,
                 "duration_us": 0,
                 "status": "ready",

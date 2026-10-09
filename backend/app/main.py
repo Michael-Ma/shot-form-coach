@@ -19,7 +19,6 @@ from .contracts import (
     AssetLabel,
     ClipSpan,
     CreateAnalysis,
-    ImportWorkbench,
     PhaseCorrection,
     ReportRequest,
     RevisionRequest,
@@ -27,7 +26,7 @@ from .contracts import (
 )
 from .db import Repository
 from .lifecycle import asset_lifecycle, create_clip, import_video, sessions, trim_clip
-from .media import MediaError, import_workbench, ingest
+from .media import MediaError, ingest
 from .pose_comparison import build_pose_comparison
 from .provider import ensure_ready
 from .provider_diagnostics import with_model_diagnostic
@@ -246,7 +245,7 @@ def create_app(settings=None, start_worker=True):
         return {
             "status": "ok",
             "app": "shot-form-coach",
-            "version": "0.6.1",
+            "version": "0.6.2",
             "gemini_configured": bool(settings.api_key),
             "gemini_model": settings.model_id,
             "astra_model": settings.astra_model,
@@ -256,7 +255,6 @@ def create_app(settings=None, start_worker=True):
                 (settings.data_dir / "models" / p).is_file()
                 for p in ["pose_landmarker_full.task", "yolox_s.onnx"]
             ),
-            "workbench_configured": bool(settings.workbench_data),
         }
 
     @api.get("/api/assets")
@@ -381,33 +379,6 @@ def create_app(settings=None, start_worker=True):
                 return public(ingest(settings, repo, Path(temp.name), Path(file.filename or "Shot").name))
             except MediaError:
                 raise HTTPException(422, "invalid_or_long_video") from None
-
-    @api.get("/api/workbench/runs")
-    def runs():
-        if not settings.workbench_data:
-            return []
-        result = []
-        for folder in (settings.workbench_data / "runs").glob("run_*"):
-            path = folder / "results.json"
-            if path.is_file():
-                try:
-                    raw = json.loads(path.read_text())
-                    count = sum(
-                        e.get("clip_status") == "succeeded" and not e.get("duplicate_of")
-                        for e in raw.get("events", [])
-                    )
-                    if count:
-                        result.append({"id": folder.name, "clip_count": count})
-                except (ValueError, OSError):
-                    continue
-        return result
-
-    @api.post("/api/workbench/import")
-    def import_run(request: ImportWorkbench):
-        try:
-            return [public(a) for a in import_workbench(settings, repo, request.run_id)]
-        except (MediaError, OSError, KeyError, ValueError):
-            raise HTTPException(422, "workbench_import_failed") from None
 
     @api.post("/api/analyses")
     def analyze(request: CreateAnalysis, idempotency_key: str | None = Header(default=None)):

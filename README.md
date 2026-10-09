@@ -1,8 +1,7 @@
 # Shot Form Coach
 
 A local basketball training-video library with editable shooting clips, traceable movement
-measurements, optional phase correction, and written, image, and video reports. This is a separate project from
-[Video Event Workbench](https://github.com/Michael-Ma/video-event-workbench).
+measurements, optional phase correction, and written, image, and video reports. The application owns its video library, clip management and analysis workflow independently.
 
 **Status: runnable engineering V1.** The local vision workflow has been exercised on six
 real shooting clips. Coaching accuracy and training effectiveness require further validation.
@@ -36,9 +35,8 @@ conflicting listeners and stops only its own children. Initial startup installs 
 dependencies and downloads checksum-pinned MediaPipe and YOLOX models (about 45 MB).
 Use Ctrl+C to stop. Local analysis requires no API key and makes no model API calls.
 
-To import existing Workbench clips, set `SFC_WORKBENCH_DATA` in `.env` to the absolute path
-of that project's `.data` directory. Otherwise upload a video of one shot, at most 30 seconds.
-Clips are copied into this project's data directory, with their original frame timestamps.
+Import complete recordings through the video library. Originals and shooting clips are stored
+locally in this project, with their original frame timestamps.
 
 ## A review you can use at your next practice
 
@@ -53,7 +51,8 @@ comparators, sources, exports and activity/costs remain available in expandable 
 
 Local vision produces a clearly labelled **movement summary**. Gemini/Astra can additionally
 produce a bilingual **visual coaching review** using the supplied teaching rubric, measured
-context and input frames. Analysis, import, comparison, playback and language settings share the top-right Settings drawer.
+context and input frames. Analysis, comparison, playback and language settings share the top-right Settings drawer.
+Video import is the primary action in the video library.
 The page shows the selected method beside the analysis action. The app remembers an explicit
 choice but never starts a remote request simply because a selection or page changes.
 
@@ -64,7 +63,7 @@ The teaching goals are server-controlled; the model cannot silently redefine the
 ## Try the workflow
 
 1. Start in the video library and **import a full recording**. The original is retained locally;
-   a playable preview is prepared in the background. Existing Workbench batches and short clips
+   a playable preview is prepared in the background. Existing local short clips
    remain grouped by source. Import does not start a remote analysis.
 2. Open the recording to manage clips. Run the optional local candidate scan, review each proposed
    range, or mark start/end times manually. Rename, trim, move clips to trash, and restore them.
@@ -72,7 +71,7 @@ The teaching goals are server-controlled; the model cannot silently redefine the
    as if it described the new boundaries. Each saved clip is at most 30 seconds.
 3. Select the clips to analyze. Choose the method and recording context in the top-right
    **Settings**, then start analysis. Settings also contains reference, playback and language
-   preferences, plus the optional import of previously cut Workbench clips.
+   preferences.
 4. Open a clip's review. Inspect the body and ball candidates, release interval, and wrist-height curve. Toggle
    movement focus to see the full source frame.
 5. Optionally step to the last contact and first clear separation, select both, and save.
@@ -233,5 +232,4 @@ are later extensions with their own acceptance criteria.
 [Interpretation](docs/SAMPLE_REVIEW.zh-CN.md)
 
 This earlier example was annotated by visual inspection and remains a design reference,
-separate from the new automatic engine. To reproduce it, use `scripts/render_example.py`
-with your Workbench data directory and `requirements-render.txt`.
+separate from the current automatic engine.

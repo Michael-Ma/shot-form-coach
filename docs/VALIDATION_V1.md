@@ -297,3 +297,14 @@ The installed local app was upgraded to 0.6.1 and targeted CLI diagnostics were 
 future user-initiated analyses. The original 13 clips, source hashes, frame mappings, phase
 revisions, model-review records and saved reports matched the pre-update snapshot exactly.
 No private analysis was resubmitted during installation.
+
+## Independent video import (V0.6.2)
+
+The homepage now has one primary video-import entry. The external Workbench importer,
+startup request for its completed runs, backend routes and environment configuration were
+removed. Existing saved assets remain local collections with generic labels; their original
+timelines and reviews are retained. No external project's directory is read by the application.
+
+148 backend tests and 34 frontend tests pass, with Ruff, TypeScript/Vite production build
+and the lockfile check. The updated interface regression checks both English and Chinese,
+one import button, no Workbench text and no external-project import requests.

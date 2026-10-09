@@ -36,9 +36,8 @@ beforeEach(() => {
   vi.spyOn(window, "scrollTo").mockImplementation(() => {});
   vi.stubGlobal("fetch", vi.fn(async (path: string, init?: RequestInit) => {
     const ok = (value: unknown) => ({ ok: true, json: async () => value });
-    if (path === "/api/health") return ok({ models_ready: true, gemini_configured: true, workbench_configured: false });
+    if (path === "/api/health") return ok({ models_ready: true, gemini_configured: true });
     if (path === "/api/jobs") return ok(jobs);
-    if (path === "/api/workbench/runs") return ok([]);
     if (path === "/api/assets") return ok(clips.filter((clip) => !clip.trashed_at));
     if (path === "/api/videos") return ok(videos.map(counts));
     if (/^\/api\/videos\/[^/]+\?/.test(path)) { const id = path.split("/")[3].split("?")[0]; return ok({ ...counts(videos.find((video) => video.id === id)!), clips: clips.filter((clip) => clip.session_id === id), candidates, ...scanState }); }
@@ -72,7 +71,7 @@ describe("full-video lifecycle", () => {
     await screen.findByRole("button", { name: "Manage clips · Saturday practice.mp4" });
     expect(screen.getByRole("heading", { name: "One session. One change to practice." })).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Analyze this shot/ })).toBeNull();
-    fireEvent.change(screen.getByLabelText("Import a training video"), { target: { files: [new File(["fixture"], "new.mp4", { type: "video/mp4" })] } });
+    fireEvent.change(screen.getByLabelText("Import video"), { target: { files: [new File(["fixture"], "new.mp4", { type: "video/mp4" })] } });
     expect(await screen.findByRole("heading", { name: "New practice.mp4" })).toBeTruthy();
     expect(screen.getByText("Preparing video preview…")).toBeTruthy();
     expect(requests.map((request) => request.path)).toEqual(["/api/videos/upload"]);

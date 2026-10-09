@@ -20,8 +20,7 @@ const makeAsset = (id: string, label: string) => ({
   report_request: { reference_asset_id: undefined as string | undefined, assume_same_view: false },
 });
 let fixtureAssets: ReturnType<typeof makeAsset>[];
-let fixtureHealth: { models_ready: boolean; gemini_configured: boolean; astra_api_configured: boolean; workbench_configured: boolean; codex: { ready: boolean; reason: string } };
-let fixtureRuns: { id: string; clip_count: number }[];
+let fixtureHealth: { models_ready: boolean; gemini_configured: boolean; astra_api_configured: boolean; codex: { ready: boolean; reason: string } };
 let stored: Map<string, string>;
 let fixtureComparison: PoseComparison;
 const points = Array.from({ length: 33 }, (_, n) => ({ x: .45 + (n % 2) * .1, y: .2 + n * .015, visibility: .98 }));
@@ -35,8 +34,7 @@ const closeSettings = () => fireEvent.click(screen.getByRole("button", { name: "
 beforeEach(() => {
   stored = new Map();
   vi.stubGlobal("localStorage", { getItem: (key: string) => stored.get(key) ?? null, setItem: vi.fn((key: string, value: string) => stored.set(key, value)), clear: () => stored.clear() });
-  fixtureHealth = { models_ready: true, gemini_configured: false, astra_api_configured: false, workbench_configured: false, codex: { ready: false, reason: "codex_login_required" } };
-  fixtureRuns = [];
+  fixtureHealth = { models_ready: true, gemini_configured: false, astra_api_configured: false, codex: { ready: false, reason: "codex_login_required" } };
   fixtureComparison = {
     version: "1", mode: "teaching", label: text("Teaching target illustration", "教学目标示意"), description: text("Arm extension illustration, fitted to your own segment lengths.", "按本人手臂长度绘制的伸展示意。"), source_type: "teaching_schematic", source_ids: [], coordinate_system: "normalized_own_frame", comparison_status: "available",
     frames: frames.map((frame, n) => ({ frame_index: n, phase: n === 0 ? "outside_phase" : n === 1 ? "release" : "follow_through", available: n > 0, reason: n === 0 ? "outside_phase" : undefined, target_landmarks: points.map((p) => ({ ...p, x: p.x + .1 })), connections: [[12, 14], [14, 16]], own_evidence: { ...frame, asset_id: "b" }, deltas: [] })),
@@ -53,7 +51,6 @@ beforeEach(() => {
     if (path === "/api/videos/session?include_trashed=true") return { ok: true, json: async () => ({ ...session, clips: fixtureAssets, candidates: [] }) };
     if (path === "/api/assets") return { ok: true, json: async () => fixtureAssets };
     if (path === "/api/jobs") return { ok: true, json: async () => [] };
-    if (path === "/api/workbench/runs") return { ok: true, json: async () => fixtureRuns };
     if (path === "/api/health") return { ok: true, json: async () => fixtureHealth };
     if (path === "/api/analyses" && options?.method === "POST") return { ok: true, json: async () => ({}) };
     if (path.includes("/tracks")) return { ok: true, json: async () => ({ frames: frames.map(() => ({ width: 640, height: 480, landmarks: points, person_box: null, ball: null })) }) };
@@ -221,27 +218,27 @@ describe("unified settings drawer", () => {
     expect(shortcut.defaultPrevented).toBe(false);
     expect(document.activeElement).toBe(first);
   });
-  it("offers Workbench import from the video library without starting analysis", async () => {
-    fixtureHealth.workbench_configured = true;
+  it("offers one independent video import in both languages without reading another project", async () => {
     render(<App />);
     await screen.findByRole("button", { name: /Manage clips · Imported shots/ });
-    fireEvent.click(screen.getByText("Import existing Workbench clips"));
-    expect(screen.getByText("No completed runs with clips are available yet.")).toBeTruthy();
-    fixtureRuns = [{ id: "test-run-12345678", clip_count: 3 }];
-    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
-    await screen.findByRole("combobox", { name: "Completed Workbench run" });
-    expect(screen.getByRole("option", { name: "12345678 · 3 clips" })).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Import clips" }) as HTMLButtonElement).disabled).toBe(false);
-    expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method || init.method === "GET")).toBe(true);
+    expect(screen.getAllByRole("button", { name: "Import video" })).toHaveLength(1);
+    expect(document.body.textContent).not.toMatch(/Workbench/);
+    openSettings();
+    fireEvent.click(screen.getByRole("button", { name: "中文" }));
+    fireEvent.click(screen.getByRole("button", { name: "关闭设置" }));
+    expect(screen.getAllByRole("button", { name: "导入视频" })).toHaveLength(1);
+    expect(document.body.textContent).not.toMatch(/Workbench/);
+    expect(vi.mocked(fetch).mock.calls.some(([path]) => String(path).includes("/workbench/"))).toBe(false);
+    expect(vi.mocked(fetch).mock.calls.some(([path]) => path === "/api/analyses")).toBe(false);
   });
   it("keeps a failed full-video upload visible in the library without starting analysis", async () => {
     render(<App />);
     await screen.findByRole("button", { name: /Manage clips · Imported shots/ });
     vi.mocked(fetch).mockImplementationOnce(async () => ({ ok: false, json: async () => ({ detail: "empty_upload" }) } as Response));
-    fireEvent.change(screen.getByLabelText("Import a training video"), { target: { files: [new File([""], "test.mp4", { type: "video/mp4" })] } });
+    fireEvent.change(screen.getByLabelText("Import video"), { target: { files: [new File([""], "test.mp4", { type: "video/mp4" })] } });
     expect(await screen.findByRole("alert")).toBeTruthy();
     expect(screen.getByText("The selected file is empty.")).toBeTruthy();
-    expect(screen.getByRole("button", { name: /Import a training video/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Import video/ })).toBeTruthy();
     expect(vi.mocked(fetch).mock.calls.some(([path]) => path === "/api/analyses")).toBe(false);
   });
   it("validates saved options instead of displaying invalid preferences", async () => {

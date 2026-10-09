@@ -14,7 +14,6 @@ class Settings:
     data_dir: Path
     api_key: str = ""
     model_id: str = "gemini-3.8-flash"
-    workbench_data: Path | None = None
     max_upload_mb: int = 512
     openai_api_key: str = ""
     astra_model: str = "gpt-6-astra"
@@ -26,12 +25,10 @@ class Settings:
     @classmethod
     def from_env(cls):
         load_dotenv(ROOT / ".env")
-        source = os.getenv("SFC_WORKBENCH_DATA", "")
         return cls(
             Path((os.getenv("SFC_DATA_DIR") or str(ROOT / ".data"))).resolve(),
             os.getenv("GEMINI_API_KEY", ""),
             (os.getenv("GEMINI_MODEL") or "gemini-3.8-flash"),
-            Path(source).resolve() if source else None,
             openai_api_key=os.getenv("OPENAI_API_KEY", ""),
             astra_model=os.getenv("ASTRA_MODEL") or "gpt-6-astra",
             codex_bin=os.getenv("SFC_CODEX_BIN") or None,

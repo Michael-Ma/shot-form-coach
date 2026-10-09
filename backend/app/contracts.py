@@ -43,10 +43,6 @@ class ReportRequest(BaseModel):
     assume_same_view: bool = False
 
 
-class ImportWorkbench(BaseModel):
-    run_id: str = Field(pattern=r"^run_[a-zA-Z0-9_]+$")
-
-
 class RevisionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     expected_revision: int = Field(ge=0)
