@@ -10,9 +10,9 @@ Coaching accuracy and training effectiveness are still being evaluated.
 
 ## Demo
 
-[![Watch the Shot Form Coach workflow demo](examples/workflow-demo-poster.jpg)](examples/workflow-demo.mp4)
+https://github.com/user-attachments/assets/9cf6a875-9fee-4482-b58b-e83774198938
 
-[Watch or download the demo (MP4, about 50 seconds)](examples/workflow-demo.mp4).
+[Download the demo (MP4, about 50 seconds)](examples/workflow-demo.mp4).
 It shows video import, marking and trimming a shot, local analysis, the pose overlay, and a
 written report download. Waiting pauses are shortened; the recording has captions and no audio.
 
