@@ -3,11 +3,24 @@
 A local basketball training-video library with editable shooting clips, traceable movement
 measurements, optional phase correction, and written, image, and video reports. The application owns its video library, clip management and analysis workflow independently.
 
-**Status: runnable engineering V1.** The local vision workflow has been exercised on six
-real shooting clips. Coaching accuracy and training effectiveness require further validation.
-Gemini and Astra are selectable. Astra supports the OpenAI API and a signed-in Codex CLI.
-The Codex transport has a successful live check on synthetic images; private shooting clips
-have not been sent through it in this validation run.
+**Status: runnable engineering prototype, v0.7.0.** Import a recording, organize its shots,
+review visible movement, and export evidence for your next practice. Local vision runs without
+an API key; Gemini and Astra add optional visual coaching. English and Chinese are supported.
+Coaching accuracy and training effectiveness are still being evaluated.
+
+## Demo
+
+[![Watch the Shot Form Coach workflow demo](examples/workflow-demo-poster.jpg)](examples/workflow-demo.mp4)
+
+[Watch or download the demo (MP4, about 50 seconds)](examples/workflow-demo.mp4).
+It shows video import, marking and trimming a shot, local analysis, the pose overlay, and a
+written report download. Waiting pauses are shortened; the recording has captions and no audio.
+
+The footage reuses the shooting panel of the repository's existing
+[public design example](examples/follow-through-comparison.mp4), which was already slowed and
+phase-aligned. This is a real interface walkthrough using local analysis, not a timing benchmark
+or an evaluation of coaching accuracy. No new private footage or remote model request is used
+in this demo.
 
 ## Run locally
 
@@ -222,8 +235,15 @@ uv sync --locked --extra dev --python 3.12
 .venv/bin/pytest -q
 .venv/bin/ruff check backend
 npm ci --prefix web
+npm run test --prefix web
 npm run build --prefix web
 ```
+
+The v0.7 implementation passed 153 backend tests, 35 frontend tests, Ruff and the production
+build. One explicitly authorized Astra/Codex comparison on a real shooting clip completed and
+passed evidence validation: seven dimensions were assessed as aligned and two remained unclear.
+The app displayed limited visibility. That single result does not establish coaching sensitivity
+or explain a missed shot. See the [validation record](docs/VALIDATION_V1.md) for scope and limits.
 
 Private media, model binaries, runtime reports, API keys, and dependency folders are ignored
 by Git. Models are downloaded from the publishers' URLs recorded in `models/manifest.json`.
