@@ -344,3 +344,8 @@ text-only protocol probe was blocked before execution by automatic approval revi
 export of the new prompt and rubric had not been explicitly authorized. A new private-clip
 comparison remains conditional on explicit user authorization. Local checks verify software
 behavior; they do not establish improved coaching sensitivity or accuracy.
+### Authorized comparison follow-up
+
+After explicit user authorization, one Astra/Codex call used the current nine-dimension rubric and 80 image views (12 full-scene, 68 native body crops). The call completed successfully in 71.949 seconds, used 77,573 input and 2,692 output tokens, and passed structured/evidence validation. It returned all nine coverage entries: seven aligned and two uncertain, with no ranked issues. The new outcome is limited visibility, not a whole-form pass.
+
+The uncertain dimensions are guide-hand behavior and shooting-arm alignment. A local check of the cited original-pixel frames supports the stated overlap/visibility limits. The review and exports were saved to the current clip revision, and the exported movie decoded successfully. This is a successful protocol/input comparison, not evidence that coaching sensitivity or cause-of-miss diagnosis is validated. No second model request was made.
