@@ -289,20 +289,20 @@ def reviewed_without_faults():
 
 
 @pytest.mark.parametrize("side_source", ["user_setting", "ambiguous_estimate"])
-def test_cited_model_strengths_without_issues_are_a_completed_visual_review(side_source):
+def test_cited_strengths_survive_but_missing_coverage_is_incomplete(side_source):
     shot = asset(side_source=side_source)
     coaching = reviewed_without_faults()
     shot["model_assist"] = {"asset_revision": 4, "coaching": coaching}
     result = build_review(shot)
-    assert result["outcome"] == "no_priority_issue"
+    assert result["outcome"] == "limited_visibility"
     assert result["assessment_source"] == "model"
     assert result["overall"]["summary"] == coaching["overall_summary"]
     assert result["strengths"] == coaching["strengths"]
     assert result["issues"] == []
-    assert "不代表动作完美" in result["empty_state"]["detail"]["zh"]
+    assert "不能据此判断" in result["empty_state"]["detail"]["zh"]
     assert result["coverage"]["model_review"] == "accepted"
     assert result["coverage"]["dimension_coverage"] == "unspecified"
-    assert result["coverage"]["dimensions"] == []
+    assert len(result["coverage"]["missing_dimensions"]) == 9
     if side_source == "ambiguous_estimate":
         assert any("出手侧" in item["zh"] for item in result["limitations"])
         assert result["coverage"]["available_metrics"] == 1
@@ -382,9 +382,11 @@ def test_coverage_distinguishes_observed_alignment_from_unseen_details():
     ]
     shot["model_assist"] = {"asset_revision": 4, "coaching": coaching}
     result = build_review(shot)
-    assert result["outcome"] == "no_priority_issue"
+    assert result["outcome"] == "limited_visibility"
     assert result["coverage"]["dimension_coverage"] == "reported"
-    assert result["coverage"]["dimensions"] == coaching["coverage"]
+    assert result["coverage"]["assessed_dimensions"] == 1
+    assert len(result["coverage"]["missing_dimensions"]) == 7
+    assert result["coverage"]["uncertain_dimensions"] == ["quiet_guide_hand"]
     coaching["coverage"][0]["status"] = "uncertain"
     assert build_review(shot)["outcome"] == "limited_visibility"
 

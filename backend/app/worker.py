@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import threading
 
-from .analysis import measure, propose_phases
+from .analysis import current_phases, measure, propose_phases
 from .db import now
 from .lifecycle import prepare_video
 from .perception import analyze as extract_tracks
@@ -175,6 +175,7 @@ class Worker:
                                     {
                                         **asset,
                                         "phases": phases,
+                                        "tracks_path": str(path.relative_to(self.settings.data_dir)),
                                         "analysis_config": config,
                                         "measurements": measure(track, phases, side, origin),
                                     },
@@ -189,6 +190,7 @@ class Worker:
                             except ValueError as exc:
                                 model_error = str(exc)
                                 errors.append({"asset_id": asset_id, "code": model_error})
+                        phases = current_phases(track, phases)
                         updated = self.repo.update_if_revision(
                             asset_id,
                             revision,

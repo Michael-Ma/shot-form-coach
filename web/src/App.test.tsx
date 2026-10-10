@@ -81,6 +81,17 @@ describe("coaching-first review", () => {
     expect(screen.getByText("出手节奏")).toBeTruthy();
     expect(screen.queryByText("Work on the finish")).toBeNull();
   });
+  it("shows incomplete assessment coverage beside the overall judgment", async () => {
+    fixtureAssets = fixtureAssets.map(a => ({ ...a, coaching: { ...a.coaching, assessment_source: "model", outcome: "limited_visibility", coverage: { model_review: "accepted", dimension_coverage: "reported", available_metrics: 4, total_metrics: 4, withheld_dimensions: [], assessed_dimensions: 4, total_dimensions: 9, complete: false, missing_dimensions: ["stance_and_load", "ball_path", "shooting_arm_alignment", "release_timing"], uncertain_dimensions: ["quiet_guide_hand"], dimensions: [{ rubric_id: "stance_and_load", label: text("Stance and preparation"), status: "not_reviewed", detail: text("This saved review did not assess stance."), evidence_frame_ids: [] }] } } }));
+    render(<App />);
+    await enterReview();
+    const summary = await screen.findByTestId("coaching-summary");
+    expect(within(summary).getByText("4/9 dimensions assessed")).toBeTruthy();
+    expect(within(summary).getByText("1 unclear · 4 not reviewed")).toBeTruthy();
+    fireEvent.click(within(summary).getByText("Dimension checklist and evidence"));
+    expect(within(summary).getByText("Stance and preparation")).toBeTruthy();
+    expect(within(summary).getByText("Not reviewed")).toBeTruthy();
+  });
   it("hides stale comparison exports until the selected reference is rebuilt", async () => {
     render(<App />);
     await enterReview();

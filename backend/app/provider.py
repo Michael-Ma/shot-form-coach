@@ -11,6 +11,7 @@ from .billing import estimate_call_cost, pricing_snapshot
 from .coaching import ModelCoaching, load_rubric, validate_model_coaching
 from .codex_runner import CodexCallInterrupted, call_codex, codex_status
 from .db import ident, now
+from .model_inputs import prepare_model_frames
 from .provider_diagnostics import classify_failure
 
 
@@ -73,6 +74,15 @@ INSTRUCTION = (
     "A successful review with no major fault must still explain what looks sound and what cannot be seen. "
     "Do not conflate no priority issue with inability to analyze. "
     "Observations are optional coarse visibility/rhythm/finish classifications, limited to three."
+    " Review ALL supplied dimensions and their review_checks, rather than looking only for gross failures."
+    " A small, actionable visible deviation can be an issue without a stumble or complete interruption."
+    " For aligned coverage state the positive evidence for the applicable checks; absence of an obvious fault"
+    " is not enough. Mark unseen or unassessed detail uncertain/not_visible. Do not declare the entire form sound"
+    " when only part was assessable. First inspect setup, ball route, arm/ball alignment and the release sequence,"
+    " then landing and finish. Return one coverage entry for EVERY dimension."
+    " Full_scene images establish context; body_detail images are fixed crops of the SAME original frames."
+    " A repeated frame ID in two views is one time instant, not two temporal observations."
+    " Local phase/hand estimates are provisional and may be wrong; check the images independently."
 )
 
 
@@ -140,7 +150,9 @@ def call_sdk(settings, frames, config):
     parts = []
     for frame in frames:
         parts += [
-            types.Part.from_text(text=f"FRAME {frame['frame_id']} clip_us={frame['time_us']}"),
+            types.Part.from_text(
+                text=f"FRAME {frame['frame_id']} clip_us={frame['time_us']} view={frame.get('view', 'full_scene')}"
+            ),
             types.Part.from_bytes(data=settings.resolve(frame["path"]).read_bytes(), mime_type="image/jpeg"),
         ]
     parts.append(
@@ -216,11 +228,18 @@ def assist(settings, repo, job_id, asset, config, cancelled, transport=None):
                     }
                 updated_receipts.append(prior)
             repo.patch("job", previous["id"], receipts=updated_receipts)
-    frames = sampled_frames(asset, config["max_input_frames"])
+    receipt_id = ident("call")
+    frames, input_plan = prepare_model_frames(
+        settings,
+        asset,
+        config["max_input_frames"],
+        settings.data_dir / "receipts" / receipt_id / "inputs",
+        sampled_frames,
+    )
     if cancelled():
         raise InterruptedError("cancelled")
     receipt = {
-        "id": ident("call"),
+        "id": receipt_id,
         "asset_id": asset["id"],
         "asset_revision": asset["revision"],
         "status": "submitting",
@@ -233,6 +252,8 @@ def assist(settings, repo, job_id, asset, config, cancelled, transport=None):
         "timeout_s": config["request_timeout_s"],
         "max_output_tokens": None if mode == "astra_codex" else 16000,
         "retry_attempts": 1,
+        "input_plan": input_plan,
+        "rubric_version": load_rubric()["version"],
         "cost": {"status": "pending", "estimated_usd": None},
     }
     receipts = job["receipts"] + [receipt]
@@ -336,7 +357,11 @@ def assist(settings, repo, job_id, asset, config, cancelled, transport=None):
             for o in reply.observations
         ):
             raise ValueError("invalid observation evidence")
-        coaching = validate_model_coaching(reply.coaching, set(by_id)) if reply.coaching else None
+        coaching = (
+            validate_model_coaching(reply.coaching, set(by_id), require_complete=True)
+            if reply.coaching
+            else None
+        )
         phase = None
         if all(pair):
             a, b = by_id[pair[0]], by_id[pair[1]]
@@ -362,5 +387,7 @@ def assist(settings, repo, job_id, asset, config, cancelled, transport=None):
         "observations": [o.model_dump() for o in reply.observations],
         "receipt_id": receipt["id"],
         "asset_revision": asset["revision"],
+        "rubric_version": load_rubric()["version"],
+        "input_plan": input_plan,
         "coaching": coaching,
     }

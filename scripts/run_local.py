@@ -68,7 +68,7 @@ def main():
     if args.check:
         return
     existing = health()
-    if existing and existing.get("app") == "shot-form-coach" and existing.get("version") == "0.6.2":
+    if existing and existing.get("app") == "shot-form-coach" and existing.get("version") == "0.7.0":
         try:
             with urllib.request.urlopen(UI_URL, timeout=2):
                 pass

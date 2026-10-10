@@ -31,7 +31,15 @@ class ModelStrength(BaseModel):
 
 
 RubricId = Literal[
-    "coordinated_rise", "balanced_landing", "comfortable_release", "quiet_guide_hand", "relaxed_finish"
+    "coordinated_rise",
+    "balanced_landing",
+    "comfortable_release",
+    "quiet_guide_hand",
+    "relaxed_finish",
+    "stance_and_load",
+    "ball_path",
+    "shooting_arm_alignment",
+    "release_timing",
 ]
 
 
@@ -65,7 +73,7 @@ class ModelCoaching(BaseModel):
     issues: list[ModelIssue] = Field(max_length=3)
     # Older cached reviews lack coverage; accepting them must not imply that all
     # dimensions were assessed or that unseen hands were judged to be correct.
-    coverage: list[ModelCoverage] = Field(default_factory=list, max_length=5)
+    coverage: list[ModelCoverage] = Field(default_factory=list, max_length=9)
 
 
 def bi(en, zh):
@@ -77,7 +85,7 @@ def load_rubric():
     return json.loads((Path(__file__).resolve().parents[2] / "references/coaching-rubric.json").read_text())
 
 
-def validate_model_coaching(coaching, frame_ids):
+def validate_model_coaching(coaching, frame_ids, require_complete=False):
     """Validate provenance before accepting prose; cap unverified issue priority.
 
     Frame references prove what inputs were available, not that every interpretation
@@ -130,7 +138,15 @@ def validate_model_coaching(coaching, frame_ids):
             raise ValueError("duplicate coaching dimension")
         seen.add(issue["rubric_id"])
         if (
-            issue["rubric_id"] in ("coordinated_rise", "balanced_landing", "relaxed_finish")
+            issue["rubric_id"]
+            in (
+                "coordinated_rise",
+                "balanced_landing",
+                "relaxed_finish",
+                "stance_and_load",
+                "ball_path",
+                "release_timing",
+            )
             and len(set(issue["evidence_frame_ids"])) < 2
         ):
             raise ValueError("temporal coaching requires multiple distinct frames")
@@ -156,10 +172,24 @@ def validate_model_coaching(coaching, frame_ids):
             if not evidence:
                 raise ValueError("assessed coverage requires frame evidence")
             if (
-                item["rubric_id"] in ("coordinated_rise", "balanced_landing", "relaxed_finish")
+                item["rubric_id"]
+                in (
+                    "coordinated_rise",
+                    "balanced_landing",
+                    "relaxed_finish",
+                    "stance_and_load",
+                    "ball_path",
+                    "release_timing",
+                )
                 and len(evidence) < 2
             ):
                 raise ValueError("temporal coverage requires multiple distinct frames")
+    if require_complete:
+        if covered != set(rubric):
+            raise ValueError("current review must cover every rubric dimension")
+        statuses = {item["rubric_id"]: item["status"] for item in result["coverage"]}
+        if any(statuses[issue["rubric_id"]] != "needs_review" for issue in result["issues"]):
+            raise ValueError("issue contradicts dimension coverage")
     return result
 
 
@@ -221,8 +251,8 @@ def _human_metrics(asset):
                 bi("Dip to release", "下沉到出手"),
                 bi(f"About {seconds:.2f} s", f"约 {seconds:.2f} 秒"),
                 bi(
-                    "Estimated from the lowest visible hip position to release. Use repeated shots to review rhythm; faster is not automatically better.",
-                    "从画面中髋部最低点算到离手，反映这球的起身阶段时长。对比多球看节奏，不以越快越好。",
+                    "Estimated from the final visible hip dip near release, excluding earlier setup. Compare repeated shots; faster is not automatically better.",
+                    "从离手前最近一段动作中的髋部低点算起，排除更早的准备动作。对比多球看节奏，不以越快越好。",
                 ),
                 rhythm,
             )
@@ -639,6 +669,31 @@ def build_review(asset, comparison=None):
         )
     available = [m for m in metrics if m["status"] == "measured"]
     limited = phase_limited or len(available) < 2
+    reported = {item["rubric_id"]: item for item in coaching["coverage"]} if coaching else {}
+    missing_dimensions = [d["id"] for d in rubric["dimensions"] if d["id"] not in reported]
+    uncertain_dimensions = [
+        key for key, item in reported.items() if item["status"] in ("uncertain", "not_visible")
+    ]
+    assessed_count = sum(item["status"] in ("aligned", "needs_review") for item in reported.values())
+    complete_review = not missing_dimensions and not uncertain_dimensions
+    display_coverage = (
+        [
+            {**reported[d["id"]], "label": d["label"]}
+            if d["id"] in reported
+            else {
+                "rubric_id": d["id"],
+                "label": d["label"],
+                "status": "not_reviewed",
+                "detail": bi(
+                    "This saved review did not assess this dimension.", "这份已保存的评价没有检查这一项。"
+                ),
+                "evidence_frame_ids": [],
+            }
+            for d in rubric["dimensions"]
+        ]
+        if coaching
+        else []
+    )
     if model_failed and not coaching:
         outcome = "model_failed"
     elif not has_analysis and not coaching:
@@ -647,6 +702,7 @@ def build_review(asset, comparison=None):
         outcome = "issues_found"
     elif (
         coaching
+        and complete_review
         and not withheld_dimensions
         and (coaching["strengths"] or any(item["status"] == "aligned" for item in coaching["coverage"]))
         and not any(item["status"] == "needs_review" for item in coaching["coverage"])
@@ -657,6 +713,17 @@ def build_review(asset, comparison=None):
     else:
         outcome = "measurements_only"
     empty_state = _model_failure_state(diagnostic) if outcome == "model_failed" else _empty_state(outcome)
+    if coaching and not issues and not complete_review:
+        empty_state = {
+            "title": bi("The form review is incomplete", "动作检查尚不完整"),
+            "detail": bi(
+                f"{assessed_count} of {len(rubric['dimensions'])} dimensions were assessed; "
+                f"{len(uncertain_dimensions)} were unclear and {len(missing_dimensions)} were not reviewed. "
+                "No ranked correction in this result does not mean the whole shooting form passed.",
+                f"已判断 {assessed_count}/{len(rubric['dimensions'])} 项，另有 {len(uncertain_dimensions)} 项看不清、"
+                f"{len(missing_dimensions)} 项未检查。当前没有排出纠正项，不能据此判断整套投篮动作已经规范。",
+            ),
+        }
     descriptions_en, descriptions_zh = [], []
     by_id = {m["id"]: m for m in available}
     for key, intro_en, intro_zh in [
@@ -702,6 +769,8 @@ def build_review(asset, comparison=None):
     elif issues:
         headline = issues[0]["title"]
     elif outcome == "no_priority_issue":
+        headline = empty_state["title"]
+    elif coaching and not complete_review:
         headline = empty_state["title"]
     elif limited:
         headline = bi("A clearer release will make this review more useful", "看清离手，评价才能更具体")
@@ -752,12 +821,12 @@ def build_review(asset, comparison=None):
             )
         )
     return {
-        "version": "human-review-v3",
+        "version": "human-review-v4",
         "assessment_source": "model" if coaching else "measurements",
         "status": "awaiting_analysis"
         if outcome == "awaiting_analysis"
         else "limited"
-        if limited
+        if limited or (coaching and not complete_review)
         else "reviewed",
         "outcome": outcome,
         "model_diagnostic": diagnostic if model_failed else None,
@@ -774,7 +843,14 @@ def build_review(asset, comparison=None):
             "total_metrics": len(metrics),
             "withheld_dimensions": withheld_dimensions,
             "dimension_coverage": "reported" if coaching and coaching["coverage"] else "unspecified",
-            "dimensions": coaching["coverage"] if coaching else [],
+            "dimensions": display_coverage,
+            "assessed_dimensions": assessed_count,
+            "total_dimensions": len(rubric["dimensions"]),
+            "missing_dimensions": missing_dimensions,
+            "uncertain_dimensions": uncertain_dimensions,
+            "complete": complete_review if coaching else False,
+            "analyzed_rubric_version": model.get("rubric_version") if model else None,
+            "rubric_current": bool(model and model.get("rubric_version") == rubric["version"]),
         },
         "overall": {"headline": headline, "summary": summary},
         "metrics": metrics,

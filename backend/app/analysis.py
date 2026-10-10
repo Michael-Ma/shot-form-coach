@@ -148,6 +148,51 @@ def choose_side(frames, requested="auto"):
     ) > 10 else "ambiguous_estimate"
 
 
+def recent_loading_bottom(track, anchor_us):
+    """Find the final load near this release; earlier retrieval/setup is not shooting rhythm."""
+    if anchor_us is None:
+        return None
+    window = []
+    for i, frame in enumerate(track["frames"]):
+        if not anchor_us - 1_250_000 <= frame["time_us"] < anchor_us:
+            continue
+        hips = [joint(frame, side + "_hip") for side in ("left", "right")]
+        if all(visible(p) for p in hips):
+            window.append((i, frame, sum(p["y"] for p in hips) / 2))
+    if len(window) < 5:
+        return None
+    smoothed = []
+    for n, (i, frame, value) in enumerate(window):
+        neighbours = [
+            v for _, f, v in window[max(0, n - 1) : n + 2] if abs(f["time_us"] - frame["time_us"]) <= 100_000
+        ]
+        smoothed.append((i, frame, median(neighbours)))
+    bottom = max(smoothed, key=lambda item: item[2])
+    later = [v for _, frame, v in smoothed if frame["time_us"] > bottom[1]["time_us"]]
+    # A maximum at the observed boundary or no observable rise is incomplete evidence.
+    if bottom[0] == window[0][0] or len(later) < 2 or bottom[2] - min(later) < 0.005:
+        return None
+    return {
+        "range_us": [bottom[1]["time_us"]] * 2,
+        "frame_range": [bottom[0]] * 2,
+        "source": "pose_candidate",
+        "quality": "recent_pre_release_extremum",
+        "derivation_version": "recent-load-v2",
+    }
+
+
+def current_phases(track, phases):
+    result = dict(phases or {})
+    loading = result.get("loading_bottom")
+    if not loading or loading.get("source") == "pose_candidate":
+        anchor = release_anchor(result)
+        if anchor is None:
+            peak = result.get("extension_peak")
+            anchor = peak["range_us"][0] if peak else None
+        result["loading_bottom"] = recent_loading_bottom(track, anchor)
+    return result
+
+
 def propose_phases(track, config):
     frames = track["frames"]
     side, side_source = choose_side(frames, config.get("handedness", "auto"))
@@ -192,19 +237,7 @@ def propose_phases(track, config):
             "source": "ball_hand_separation_candidate",
             "quality": "needs_review",
         }
-    hip_points = []
-    for i, frame in enumerate(frames[: peak + 1]):
-        hips = [joint(frame, s + "_hip") for s in ["left", "right"]]
-        if all(visible(p) for p in hips):
-            hip_points.append((i, sum(p["y"] for p in hips) / 2))
-    if hip_points:
-        bottom = max(hip_points, key=lambda p: p[1])[0]
-        phases["loading_bottom"] = {
-            "range_us": [frames[bottom]["time_us"]] * 2,
-            "frame_range": [bottom, bottom],
-            "source": "pose_candidate",
-            "quality": "projected_extremum",
-        }
+    phases = current_phases(track, phases)
     return phases, side, side_source
 
 

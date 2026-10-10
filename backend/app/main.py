@@ -245,7 +245,7 @@ def create_app(settings=None, start_worker=True):
         return {
             "status": "ok",
             "app": "shot-form-coach",
-            "version": "0.6.2",
+            "version": "0.7.0",
             "gemini_configured": bool(settings.api_key),
             "gemini_model": settings.model_id,
             "astra_model": settings.astra_model,

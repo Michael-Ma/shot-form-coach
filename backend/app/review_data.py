@@ -6,13 +6,14 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-from .analysis import measure
+from .analysis import current_phases, measure
 
 
 @lru_cache(maxsize=32)
 def _measure_cached(path: str, modified_ns: int, phase_json: str, side: str, side_source: str):
     track = json.loads(Path(path).read_text())
-    return measure(track, json.loads(phase_json), side, side_source)
+    phases = current_phases(track, json.loads(phase_json))
+    return phases, measure(track, phases, side, side_source)
 
 
 def current_measurements(settings, asset):
@@ -22,7 +23,7 @@ def current_measurements(settings, asset):
         return result
     path = settings.resolve(asset["tracks_path"])
     try:
-        result["measurements"] = _measure_cached(
+        result["phases"], result["measurements"] = _measure_cached(
             str(path),
             path.stat().st_mtime_ns,
             json.dumps(asset.get("phases") or {}, sort_keys=True),

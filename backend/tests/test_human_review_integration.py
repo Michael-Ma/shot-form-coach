@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from app.coaching import load_rubric
 from app.config import Settings
 from app.db import Repository
 from app.main import create_app
@@ -86,7 +87,18 @@ def test_provider_saves_grounded_context_and_revision_with_model_coaching(tmp_pa
                 "last_contact_frame_id": "f0",
                 "first_clear_frame_id": "f1",
                 "observations": [],
-                "coaching": coaching(),
+                "coaching": {
+                    **coaching(),
+                    "coverage": [
+                        {
+                            "rubric_id": d["id"],
+                            "status": "needs_review" if d["id"] == "coordinated_rise" else "not_visible",
+                            "detail": text("Supported observation"),
+                            "evidence_frame_ids": ["f0", "f1"],
+                        }
+                        for d in load_rubric()["dimensions"]
+                    ],
+                },
             }
         ),
         "usage": {"prompt_token_count": 100, "candidates_token_count": 10},
@@ -104,7 +116,7 @@ def test_provider_saves_grounded_context_and_revision_with_model_coaching(tmp_pa
     assert result["coaching"]["issues"][0]["severity"] == "medium"
     receipt = repo.get("job", job["id"])["receipts"][0]
     assert receipt["coaching_context"]["camera_view"] == "side"
-    assert len(receipt["coaching_context"]["rubric"]["dimensions"]) == 5
+    assert len(receipt["coaching_context"]["rubric"]["dimensions"]) == 9
     assert receipt["coaching_context"]["comparison_scope"].startswith("single attempt")
 
 

@@ -3,7 +3,7 @@
     "id": "curry-mechanics",
     "tier": "official_teaching_article",
     "url": "https://www.masterclass.com/articles/how-to-shoot-a-basketball-with-steph-curry",
-    "checked_date": "2026-10-07",
+    "checked_date": "2026-10-09",
     "use": "stance, coordinated motion, extension and form practice",
     "media_included": false,
     "title": "Curry · shooting mechanics"
@@ -12,7 +12,7 @@
     "id": "curry-form-practice",
     "tier": "official_teaching_article",
     "url": "https://www.masterclass.com/articles/steph-currys-tips-for-form-shooting-in-basketball",
-    "checked_date": "2026-10-07",
+    "checked_date": "2026-10-09",
     "use": "close-range form practice and front/side video review",
     "media_included": false,
     "title": "Curry · form shooting practice"
@@ -184,8 +184,8 @@
     "tier": "official_teaching_article",
     "title": "Jr. NBA · shooting fundamentals",
     "url": "https://jr.nba.com/shooting/",
-    "use": "guide-hand support, relaxed follow-through, close-range form practice",
-    "checked_date": "2026-10-08",
+    "use": "shooting setup, arm/ball alignment, guide-hand support and close-range practice; goals adapted to visible evidence rather than universal angle rules",
+    "checked_date": "2026-10-09",
     "media_included": false
   }
 ]

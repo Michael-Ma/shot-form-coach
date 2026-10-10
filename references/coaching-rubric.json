@@ -1,5 +1,5 @@
 {
-  "version": "teaching-principles-2026-10-08-v1",
+  "version": "teaching-checklist-2026-10-09-v2",
   "status": "qualitative_teaching_rubric_not_validated_fault_classifier",
   "standard_definition": {
     "en": "Context-sensitive teaching goals for a comfortable, coordinated and controllable stationary practice shot. Natural individual form may differ. A single shot does not prove a habitual fault or repeatability.",
@@ -15,58 +15,331 @@
     "Do not describe one attempt as consistent, repeatable across shots, improved or a habit. Use observed single-attempt language.",
     "Numbers displayed in measurements are program-computed. Do not invent or restate measurement numbers in model prose; practical drill counts are allowed.",
     "A single selected personal reference is not a validated good shot and model coaching sees no reference video.",
-    "Suggested drill counts are product proposals for a short practice trial, not dosages validated by the cited teaching sources."
+    "Suggested drill counts are product proposals for a short practice trial, not dosages validated by the cited teaching sources.",
+    "Review every dimension, including small but actionable deviations; do not reserve issues only for a stumble or interrupted arm extension.",
+    "An aligned judgment requires positive evidence for the applicable checks. Absence of an obvious breakdown alone is insufficient.",
+    "For every dimension inspect setup, movement and completion where applicable; state which check cannot be assessed. Return all dimensions in coverage.",
+    "A missed shot is useful outcome feedback, but it does not prove a specific movement fault. Ball-flight or hoop observations must be separately evidenced; do not infer them from pose.",
+    "Describe observed deviations, plausible consequences and testable practice cues separately. Do not force problems to satisfy a quota."
   ],
   "dimensions": [
     {
       "id": "coordinated_rise",
-      "label": {"en": "Connected rise and ball lift", "zh": "起身与举球衔接"},
-      "teaching_goal": {"en": "Let the lower-body rise and ball lift connect comfortably into the release, allowing individual one-motion or two-motion styles.", "zh": "让下肢起身、举球与出手舒适衔接，允许个人采用一段式或两段式动作。"},
-      "required_evidence": ["stationary practice context", "continuous visible hips or knees, ball and shooting arm from load to release", "specific visible interruption beyond a normal individual set point"],
-      "do_not_infer": ["A slow or long measured phase alone is not poor rhythm.", "A two-motion pause alone is not a fault.", "Wrist and hip timing does not establish force transfer."],
-      "source_ids": ["curry-mechanics", "curry-form-practice"],
-      "suggested_drill": {"en": "Try two sets of five comfortable close-range shots with one cue: let the rise and ball lift flow together. Compare the release sequence with the original clip.", "zh": "试做两组、每组 5 次舒适距离近投，只想一个提示：起身与举球自然衔接。再与原片比较出手前的动作顺序。"},
-      "practice_check": {"en": "Check whether the specific stop or restart is reduced without forcing a new rhythm. Judge across the set, not from one make.", "zh": "看原来可见的停顿或重启是否减少，同时保持舒适节奏。看整组表现，不靠一球投进就下结论。"}
+      "label": {
+        "en": "Connected rise and ball lift",
+        "zh": "起身与举球衔接"
+      },
+      "teaching_goal": {
+        "en": "Let the lower-body rise and ball lift connect comfortably into the release, allowing individual one-motion or two-motion styles.",
+        "zh": "让下肢起身、举球与出手舒适衔接，允许个人采用一段式或两段式动作。"
+      },
+      "required_evidence": [
+        "stationary practice context",
+        "continuous visible hips or knees, ball and shooting arm from load to release",
+        "a specific visible sequencing deviation assessed in shooting context, not just a measured phase length"
+      ],
+      "do_not_infer": [
+        "A slow or long measured phase alone is not poor rhythm.",
+        "A two-motion pause alone is not a fault.",
+        "Wrist and hip timing does not establish force transfer."
+      ],
+      "source_ids": [
+        "curry-mechanics",
+        "curry-form-practice"
+      ],
+      "suggested_drill": {
+        "en": "Try two sets of five comfortable close-range shots with one cue: let the rise and ball lift flow together. Compare the release sequence with the original clip.",
+        "zh": "试做两组、每组 5 次舒适距离近投，只想一个提示：起身与举球自然衔接。再与原片比较出手前的动作顺序。"
+      },
+      "practice_check": {
+        "en": "Check whether the specific stop or restart is reduced without forcing a new rhythm. Judge across the set, not from one make.",
+        "zh": "看原来可见的停顿或重启是否减少，同时保持舒适节奏。看整组表现，不靠一球投进就下结论。"
+      },
+      "review_checks": [
+        "Locate the final shooting load, excluding walking, catching and dribbling earlier in the clip.",
+        "Inspect the order of leg extension, ball lift and release, and any late restart or compensatory push."
+      ]
     },
     {
       "id": "balanced_landing",
-      "label": {"en": "Controlled balance and landing", "zh": "平衡与落地控制"},
-      "teaching_goal": {"en": "Finish the stationary practice shot with a comfortably controlled landing; a natural forward drift does not itself violate this goal.", "zh": "定点练习投篮后能够舒适、可控地落地；自然向前移动本身并不违背这个目标。"},
-      "required_evidence": ["stationary practice context", "feet and trunk continuously visible through landing", "camera motion accounted for", "visible loss of balance or corrective recovery, not ordinary drift"],
-      "do_not_infer": ["Do not demand takeoff and landing on precisely the same spot.", "One landing cannot establish consistency across shots.", "Camera-relative displacement is not validated body balance."],
-      "source_ids": ["curry-mechanics", "curry-practice-routine"],
-      "suggested_drill": {"en": "Try five comfortable close-range shots. After each, notice whether you can finish in control without an extra recovery step; allow your natural landing position.", "zh": "试做 5 次舒适距离近投，每次留意落地后能否自然站稳、无需额外找平衡；允许自然的落地点变化。"},
-      "practice_check": {"en": "Compare the visible recovery movement across the set from the same fixed camera. Do not grade ordinary forward sway as an error.", "zh": "用同一固定机位比较这组是否仍需额外找平衡，不把普通向前移动当作错误。"}
+      "label": {
+        "en": "Controlled balance and landing",
+        "zh": "平衡与落地控制"
+      },
+      "teaching_goal": {
+        "en": "Finish the stationary practice shot with a comfortably controlled landing; a natural forward drift does not itself violate this goal.",
+        "zh": "定点练习投篮后能够舒适、可控地落地；自然向前移动本身并不违背这个目标。"
+      },
+      "required_evidence": [
+        "stationary practice context",
+        "feet and trunk continuously visible through landing",
+        "camera motion accounted for",
+        "specific trunk, support or recovery behavior across takeoff and landing, not ordinary drift alone"
+      ],
+      "do_not_infer": [
+        "Do not demand takeoff and landing on precisely the same spot.",
+        "One landing cannot establish consistency across shots.",
+        "Camera-relative displacement is not validated body balance."
+      ],
+      "source_ids": [
+        "curry-mechanics",
+        "curry-practice-routine"
+      ],
+      "suggested_drill": {
+        "en": "Try five comfortable close-range shots. After each, notice whether you can finish in control without an extra recovery step; allow your natural landing position.",
+        "zh": "试做 5 次舒适距离近投，每次留意落地后能否自然站稳、无需额外找平衡；允许自然的落地点变化。"
+      },
+      "practice_check": {
+        "en": "Compare the visible recovery movement across the set from the same fixed camera. Do not grade ordinary forward sway as an error.",
+        "zh": "用同一固定机位比较这组是否仍需额外找平衡，不把普通向前移动当作错误。"
+      },
+      "review_checks": [
+        "Compare trunk orientation and foot support before takeoff, at release and at landing.",
+        "Inspect abrupt trunk changes, asymmetric recovery and extra corrective steps; allow controlled natural forward travel."
+      ]
     },
     {
       "id": "comfortable_release",
-      "label": {"en": "Comfortable release and extension", "zh": "舒适出手与伸展"},
-      "teaching_goal": {"en": "Complete a comfortable shooting-arm extension into release without imposing an exact elbow angle or a universal release height.", "zh": "让出手臂舒适地伸展并完成离手，不强求固定肘角或所有人相同的出手高度。"},
-      "required_evidence": ["narrow release interval", "clear shoulder, elbow, wrist and ball in several frames around separation", "specific visible interrupted extension or release pattern that needs contextual review"],
-      "do_not_infer": ["Wrist height is not ball release height.", "A low hand position alone is not an error.", "Projected elbow angle is not a validated 3-D angle.", "Never force elbow lockout."],
-      "source_ids": ["curry-mechanics", "curry-form-practice"],
-      "suggested_drill": {"en": "Try five close-range form shots, letting the shooting arm extend comfortably toward the target. Review the hand and ball together around release; do not force the elbow straight.", "zh": "试做 5 次近距离定型投篮，让出手臂舒适地向目标伸展，回看离手附近手与球的关系，不要强行锁死肘关节。"},
-      "practice_check": {"en": "See whether the specific interruption becomes less visible while the motion stays comfortable. Compare release frames at the same distance and angle.", "zh": "看之前具体可见的中断是否减少，动作是否仍然舒适；在同距离、同角度下比较离手附近画面。"}
+      "label": {
+        "en": "Comfortable release and extension",
+        "zh": "舒适出手与伸展"
+      },
+      "teaching_goal": {
+        "en": "Complete a comfortable shooting-arm extension into release without imposing an exact elbow angle or a universal release height.",
+        "zh": "让出手臂舒适地伸展并完成离手，不强求固定肘角或所有人相同的出手高度。"
+      },
+      "required_evidence": [
+        "narrow release interval",
+        "clear shoulder, elbow, wrist and ball in several frames around separation",
+        "clear observed release sequence, including direction changes or hand adjustments when visible"
+      ],
+      "do_not_infer": [
+        "Wrist height is not ball release height.",
+        "A low hand position alone is not an error.",
+        "Projected elbow angle is not a validated 3-D angle.",
+        "Never force elbow lockout."
+      ],
+      "source_ids": [
+        "curry-mechanics",
+        "curry-form-practice"
+      ],
+      "suggested_drill": {
+        "en": "Try five close-range form shots, letting the shooting arm extend comfortably toward the target. Review the hand and ball together around release; do not force the elbow straight.",
+        "zh": "试做 5 次近距离定型投篮，让出手臂舒适地向目标伸展，回看离手附近手与球的关系，不要强行锁死肘关节。"
+      },
+      "practice_check": {
+        "en": "See whether the specific interruption becomes less visible while the motion stays comfortable. Compare release frames at the same distance and angle.",
+        "zh": "看之前具体可见的中断是否减少，动作是否仍然舒适；在同距离、同角度下比较离手附近画面。"
+      },
+      "review_checks": [
+        "Inspect continuity and direction of the shooting-arm extension and wrist completion across separation.",
+        "Check for a visible abrupt reroute, re-grip or premature braking; distinguish these from an individually chosen release height."
+      ]
     },
     {
       "id": "quiet_guide_hand",
-      "label": {"en": "Support-hand release", "zh": "辅助手离球"},
-      "teaching_goal": {"en": "Use the guide hand to support the ball while the shooting hand completes the release. A visible push or twist is a review hypothesis, not proof of force or spin.", "zh": "辅助手负责支撑，让出手手完成离球。可见的推拨或转动只能作为复核线索，不能证明实际用力或球的旋转。"},
-      "required_evidence": ["both hands and ball individually discernible at separation", "close clear frames showing a specific guide-hand movement"],
-      "do_not_infer": ["Wide-angle pose landmarks alone cannot establish guide-hand interference.", "Do not infer ball spin, applied force or miss direction."],
-      "source_ids": ["jr-nba-shooting", "curry-form-practice"],
-      "suggested_drill": {"en": "At a comfortable close distance, try five one-hand form shots, then five with the guide hand lightly supporting the ball. Record a close view of both hands at release.", "zh": "在舒适近距离先试 5 次单手定型投篮，再试 5 次辅助手轻扶球的投篮，拍清两只手在离球时的动作。"},
-      "practice_check": {"en": "Compare the visible support-hand movement in the two sets. Keep the result a hypothesis until the hands are clearly visible.", "zh": "比较两组可见的辅助手动作，只有看清双手后再确认，先把判断当作待验证的线索。"}
+      "label": {
+        "en": "Support-hand release",
+        "zh": "辅助手离球"
+      },
+      "teaching_goal": {
+        "en": "Use the guide hand to support the ball while the shooting hand completes the release. A visible push or twist is a review hypothesis, not proof of force or spin.",
+        "zh": "辅助手负责支撑，让出手手完成离球。可见的推拨或转动只能作为复核线索，不能证明实际用力或球的旋转。"
+      },
+      "required_evidence": [
+        "both hands and ball individually discernible at separation",
+        "close clear frames showing a specific guide-hand movement"
+      ],
+      "do_not_infer": [
+        "Wide-angle pose landmarks alone cannot establish guide-hand interference.",
+        "Do not infer ball spin, applied force or miss direction."
+      ],
+      "source_ids": [
+        "jr-nba-shooting",
+        "curry-form-practice"
+      ],
+      "suggested_drill": {
+        "en": "At a comfortable close distance, try five one-hand form shots, then five with the guide hand lightly supporting the ball. Record a close view of both hands at release.",
+        "zh": "在舒适近距离先试 5 次单手定型投篮，再试 5 次辅助手轻扶球的投篮，拍清两只手在离球时的动作。"
+      },
+      "practice_check": {
+        "en": "Compare the visible support-hand movement in the two sets. Keep the result a hypothesis until the hands are clearly visible.",
+        "zh": "比较两组可见的辅助手动作，只有看清双手后再确认，先把判断当作待验证的线索。"
+      },
+      "review_checks": [
+        "Inspect guide-hand position before separation and the sequence of its withdrawal.",
+        "Report a visible push-like motion as a review hypothesis only when hand/ball detail resolves it; a raised hand after separation alone proves no interference."
+      ]
     },
     {
       "id": "relaxed_finish",
-      "label": {"en": "Relaxed shooting finish", "zh": "放松随挥与收势"},
-      "teaching_goal": {"en": "In comfortable close-range practice, finish the release and briefly retain a relaxed shooting-hand position so the motion is easy to review. There is no required hold time.", "zh": "在舒适的近投练习中完整完成离手，稍留放松的收势，方便回看动作；不规定必须保持几秒。"},
-      "required_evidence": ["narrow release interval", "continuous visible shooting arm after release", "a clearly observed early sustained withdrawal, not small projection noise"],
-      "do_not_infer": ["Post-release movement does not change the ball in flight.", "A lowering percentage or hold time is not a validated fault threshold.", "This is low-priority optional practice, never a high-severity diagnosis."],
-      "source_ids": ["curry-mechanics", "curry-form-practice", "jr-nba-shooting"],
-      "suggested_drill": {"en": "Try five comfortable near-basket shots. Complete the release, briefly leave a relaxed finish, and compare the motion around release with the original clip.", "zh": "试做 5 次舒适的近筐投篮，完整完成离手，轻松保留收势片刻；再与原片比较离手附近的动作。"},
-      "practice_check": {"en": "Check whether the finish is comfortable and easier to observe across the set. Do not use hold time or a single make as proof of better shooting.", "zh": "看这组收势是否舒适、是否更容易观察；不把保持时长或一次命中当作技术改善的证明。"}
+      "label": {
+        "en": "Relaxed shooting finish",
+        "zh": "放松随挥与收势"
+      },
+      "teaching_goal": {
+        "en": "In comfortable close-range practice, finish the release and briefly retain a relaxed shooting-hand position so the motion is easy to review. There is no required hold time.",
+        "zh": "在舒适的近投练习中完整完成离手，稍留放松的收势，方便回看动作；不规定必须保持几秒。"
+      },
+      "required_evidence": [
+        "narrow release interval",
+        "continuous visible shooting arm after release",
+        "a clearly observed early sustained withdrawal, not small projection noise"
+      ],
+      "do_not_infer": [
+        "Post-release movement does not change the ball in flight.",
+        "A lowering percentage or hold time is not a validated fault threshold.",
+        "This is low-priority optional practice, never a high-severity diagnosis."
+      ],
+      "source_ids": [
+        "curry-mechanics",
+        "curry-form-practice",
+        "jr-nba-shooting"
+      ],
+      "suggested_drill": {
+        "en": "Try five comfortable near-basket shots. Complete the release, briefly leave a relaxed finish, and compare the motion around release with the original clip.",
+        "zh": "试做 5 次舒适的近筐投篮，完整完成离手，轻松保留收势片刻；再与原片比较离手附近的动作。"
+      },
+      "practice_check": {
+        "en": "Check whether the finish is comfortable and easier to observe across the set. Do not use hold time or a single make as proof of better shooting.",
+        "zh": "看这组收势是否舒适、是否更容易观察；不把保持时长或一次命中当作技术改善的证明。"
+      },
+      "review_checks": [
+        "Inspect completion through separation separately from later arm lowering.",
+        "Check whether visible wrist and arm finish make the release repeatable to inspect; do not infer muscle tension or require a fixed hold duration."
+      ]
+    },
+    {
+      "id": "stance_and_load",
+      "label": {
+        "en": "Stance and preparation",
+        "zh": "站姿与投篮准备"
+      },
+      "teaching_goal": {
+        "en": "Establish a stable, ready base before lifting the ball.",
+        "zh": "举球前建立稳定、准备充分的支撑。"
+      },
+      "review_checks": [
+        "Are the feet set and the load coordinated before the shooting lift?",
+        "Is there a visible late foot reset, unstable support or abrupt trunk adjustment?"
+      ],
+      "required_evidence": [
+        "feet, knees and trunk visible before the shooting lift"
+      ],
+      "do_not_infer": [
+        "Do not prescribe one foot angle or stance width for everyone.",
+        "Do not infer weight distribution or force from projected pose alone."
+      ],
+      "source_ids": [
+        "curry-mechanics"
+      ],
+      "suggested_drill": {
+        "en": "Compare comfortable close-range shots with the feet ready before starting the lift.",
+        "zh": "近距离练习时，先站稳并准备好双脚，再开始举球。"
+      },
+      "practice_check": {
+        "en": "Review whether the specific observed deviation changes without forcing discomfort.",
+        "zh": "复看所指出的具体偏差是否变化，避免强迫不舒适的动作。"
+      }
+    },
+    {
+      "id": "ball_path",
+      "label": {
+        "en": "Ball lift and set point",
+        "zh": "举球路径与持球点"
+      },
+      "teaching_goal": {
+        "en": "Bring the ball into a controllable shooting position with an economical visible path.",
+        "zh": "通过可控、简洁的举球路径进入出手位置。"
+      },
+      "review_checks": [
+        "Track the ball from the final preparation to the set point and release.",
+        "Inspect a pronounced lateral loop, late re-grip or path correction; allow a natural dip."
+      ],
+      "required_evidence": [
+        "ball and both arms visible across preparation and lift"
+      ],
+      "do_not_infer": [
+        "An individual dip or set point alone is not a fault.",
+        "Do not judge depth from a single oblique projection."
+      ],
+      "source_ids": [
+        "curry-form-practice"
+      ],
+      "suggested_drill": {
+        "en": "Record slow close-range shots and compare the ball path into the shooting position.",
+        "zh": "拍摄慢节奏近投，比较球进入出手位置的路线。"
+      },
+      "practice_check": {
+        "en": "Review whether the specific observed deviation changes without forcing discomfort.",
+        "zh": "复看所指出的具体偏差是否变化，避免强迫不舒适的动作。"
+      }
+    },
+    {
+      "id": "shooting_arm_alignment",
+      "label": {
+        "en": "Shooting-arm and ball alignment",
+        "zh": "出手臂与球的对齐"
+      },
+      "teaching_goal": {
+        "en": "Organize the shooting forearm, wrist and ball to extend toward the target.",
+        "zh": "让出手前臂、手腕和球形成朝目标伸展的关系。"
+      },
+      "review_checks": [
+        "Inspect the elbow under/behind the ball and the forearm/wrist relationship at the set point.",
+        "Check for a clear lateral sweep or last-moment correction through release, respecting camera projection."
+      ],
+      "required_evidence": [
+        "shooting elbow, wrist and ball individually visible across set and release"
+      ],
+      "do_not_infer": [
+        "An apparent elbow offset in an oblique view alone is insufficient.",
+        "Do not invent an exact angle or infer force/ball spin."
+      ],
+      "source_ids": [
+        "jr-nba-shooting"
+      ],
+      "suggested_drill": {
+        "en": "Use a front and side recording of comfortable close-range form shots to compare the arm and ball path.",
+        "zh": "从正面和侧面拍摄舒适近投，对照出手臂与球的路线。"
+      },
+      "practice_check": {
+        "en": "Review whether the specific observed deviation changes without forcing discomfort.",
+        "zh": "复看所指出的具体偏差是否变化，避免强迫不舒适的动作。"
+      }
+    },
+    {
+      "id": "release_timing",
+      "label": {
+        "en": "Release timing within the jump",
+        "zh": "起跳与离球时序"
+      },
+      "teaching_goal": {
+        "en": "Coordinate ball separation with the chosen shot rhythm and body extension.",
+        "zh": "让离球时机与所采用的投篮节奏和身体伸展相协调。"
+      },
+      "review_checks": [
+        "Locate takeoff, rising/descending movement and separation where visible.",
+        "Inspect a late compensatory release or a visible stop and restart; compare similar attempts before inferring a pattern."
+      ],
+      "required_evidence": [
+        "continuous legs, trunk, ball and arm through separation"
+      ],
+      "do_not_infer": [
+        "Release at one universal point of the jump is not required.",
+        "One-motion and two-motion styles can both be functional; timing alone is not a fault."
+      ],
+      "source_ids": [
+        "curry-mechanics"
+      ],
+      "suggested_drill": {
+        "en": "Compare the release sequence in a short set of comfortable shots at the same distance.",
+        "zh": "在相同距离拍摄一小组舒适投篮，对照离球与身体伸展的先后关系。"
+      },
+      "practice_check": {
+        "en": "Review whether the specific observed deviation changes without forcing discomfort.",
+        "zh": "复看所指出的具体偏差是否变化，避免强迫不舒适的动作。"
+      }
     }
   ]
 }

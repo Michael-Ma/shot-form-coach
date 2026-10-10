@@ -12,7 +12,10 @@ def call_astra_api(settings, frames, config, schema, instruction):
     for frame in frames:
         encoded = base64.b64encode(settings.resolve(frame["path"]).read_bytes()).decode()
         content += [
-            {"type": "input_text", "text": f"FRAME {frame['frame_id']} clip_us={frame['time_us']}"},
+            {
+                "type": "input_text",
+                "text": f"FRAME {frame['frame_id']} clip_us={frame['time_us']} view={frame.get('view', 'full_scene')}",
+            },
             {"type": "input_image", "image_url": "data:image/jpeg;base64," + encoded, "detail": "high"},
         ]
     body = {

@@ -308,3 +308,39 @@ timelines and reviews are retained. No external project's directory is read by t
 148 backend tests and 34 frontend tests pass, with Ruff, TypeScript/Vite production build
 and the lockfile check. The updated interface regression checks both English and Chinese,
 one import button, no Workbench text and no external-project import requests.
+
+## Detailed assessment coverage and focused inputs (V0.7)
+
+An inspected cached review had an empty raw model issue list, four aligned coarse dimensions
+and one uncertain hand dimension. The UI had therefore presented a no-priority-issue result;
+no supported issues had been removed by the display filter. That result did not establish that
+setup, ball route, arm alignment or release timing had been examined in detail.
+
+The rubric now has nine dimensions with explicit review questions. Current remote replies must
+account for all nine; missing/unclear dimensions cannot yield a whole-form no-issue conclusion.
+The visible summary reports assessment coverage and identifies saved older evaluations. Original
+model prose remains original; missing dimensions are labelled unreviewed, never retrospectively
+generated. Review provenance includes rubric and image-input-plan versions.
+
+Model inputs combine full context and fixed body crops decoded from the original pixels, under
+the existing total image cap. The inspected longer clip prepared 12 full-scene and 68 body views
+(75 distinct source frames), about 12.2 MB of JPEG data. View and crop metadata preserve source
+frame/time identities. Crops do not invent detail or make unseen fingers/forces observable.
+
+A local timing bug was also reproduced: the global minimum hip position belonged to earlier
+preparation rather than the final shooting load. The revised local-window derivation changes
+that example from about 2.92 seconds to about 0.28 seconds. Manual phase corrections remain
+authoritative; boundary maxima and insufficient rise evidence stay unavailable.
+
+153 backend tests and 35 frontend tests pass, with Ruff and the production build. New tests
+cover incomplete versus complete assessments, mandatory current rubric coverage, preserved
+old reviews, preparation versus final load, manual phase preservation, native-resolution crops,
+CFR/VFR frame/time identity and total image budgets. Chrome desktop/mobile inspection of the
+cached example confirmed the 4/9 coverage summary, one unclear dimension, four unreviewed
+dimensions and corrected timing, with no horizontal overflow.
+
+No new model assessment of private footage has been performed for this update. A synthetic
+text-only protocol probe was blocked before execution by automatic approval review because
+export of the new prompt and rubric had not been explicitly authorized. A new private-clip
+comparison remains conditional on explicit user authorization. Local checks verify software
+behavior; they do not establish improved coaching sensitivity or accuracy.

@@ -60,6 +60,22 @@ Current automatic priorities remain provisional. The system does not force three
 assign a universal form score, claim measured Curry motion or diagnose the cause of a miss.
 The teaching goals are server-controlled; the model cannot silently redefine the standard.
 
+The current checklist covers nine dimensions: preparation/stance, ball path, shooting-arm
+alignment, rise coordination, release extension, release timing, guide hand, landing and finish.
+Each has explicit checks and evidence requirements. A current model reply must account for
+every dimension, including anything unclear. An incomplete review cannot display a whole-form
+no-issue conclusion. Saved older reviews retain their original observations and show which
+dimensions were never assessed under the current checklist.
+
+Model inputs now combine full-scene context with a fixed person crop from the original
+video pixels. The total stays within the configured image cap (normally 80); crops and full
+views preserve the same original frame identifiers and timestamps. This improves access to
+visible detail but cannot reveal hidden hands, true 3D angles, force or spin. If a reliable crop
+cannot be prepared, the receipt records the fallback to full-scene frames.
+
+Automatic dip timing uses the final observable load near release, excluding earlier retrieval
+or setup. A manual load correction is preserved; insufficient load/rise evidence remains unknown.
+
 ## Try the workflow
 
 1. Start in the video library and **import a full recording**. The original is retained locally;

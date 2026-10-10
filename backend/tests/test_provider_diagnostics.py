@@ -184,7 +184,7 @@ def test_failed_review_without_measurements_describes_connection_not_video():
         }
     )
     assert review["outcome"] == "model_failed"
-    assert review["version"] == "human-review-v3"
+    assert review["version"] == "human-review-v4"
     assert review["overall"]["headline"]["zh"] == "视觉模型连接中断"
     assert "连接断开" in review["overall"]["summary"]["zh"]
     assert "是否产生用量仍未知" in review["empty_state"]["detail"]["zh"]
